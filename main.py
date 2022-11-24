@@ -177,8 +177,8 @@ def calculate_main_updated_date(df):
 def main():
     # getting tech worksheet and DFs
     # Todo: update tech_tracker_sheet for prod
-    tech_tracker_sheet = _create_sheet_connection(TECH_TRACKER_SHEET, "Prototype")
-    tracker_backup_df = tech_tracker_sheet.get_as_df(has_header=True, start=(2, 1), end=(tech_tracker_sheet.rows, 18),
+    tech_tracker_sheet = _create_sheet_connection(TECH_TRACKER_SHEET, "2022-23 Tracker")
+    tracker_backup_df = tech_tracker_sheet.get_as_df(has_header=True, start="B4", end=(tech_tracker_sheet.rows, 19),
                                                      include_tailing_empty=False)
     tracker_backup_df.astype(str)
     tracker_backup_df['Start Date - Last Updated'] = pd.to_datetime(tracker_backup_df['Start Date - Last Updated'],
@@ -210,9 +210,9 @@ def main():
     if rescinded_offer_ids:
         _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
         logger.info(f'{updated_tracker_df.to_string()}')
-    tech_tracker_sheet.set_dataframe(updated_tracker_df, (3, 1), copy_head=False)
+    tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
     sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
-    tech_tracker_sheet.sort_range('A3', sheet_dim, basecolumnindex=17, sortorder='DESCENDING')
+    tech_tracker_sheet.sort_range('B5', sheet_dim, basecolumnindex=18, sortorder='DESCENDING')
     # combined_df = pd.concat([tracker_updated_df, new_records])
     # tech_tracker_sheet.set_dataframe(combined_df, (2, 1), copy_head=False)
     #  tracker_updated_df.set_index()
