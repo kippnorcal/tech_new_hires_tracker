@@ -1,8 +1,9 @@
-from datetime import date
+from datetime import date, datetime
 import logging
 import os
 import sys
 from typing import Union
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -38,7 +39,7 @@ COLUMN_MAPPINGS = {
     15: 'SpEd',
     50: 'Cleared?',
     51: 'Cleared Email Sent',
-    54: 'Rescinded'
+#    54: 'Rescinded'
 }
 
 
@@ -55,6 +56,13 @@ def _create_sheet_connection(sheet_key: str, worksheet_name: str) -> Union[Works
     return worksheet
 
 
+def create_tracker_updated_timestamp(tracker: Worksheet) -> None:
+    timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
+    d_stamp = timestamp.strftime('%x')
+    t_stamp = timestamp.strftime('%-I:%M %p')
+    tracker.update_value('A2', f'LAST UPDATED: {d_stamp} @ {t_stamp}')
+
+
 def _create_updated_df(tech_tracker_df, mot_df):
     df = tech_tracker_df.copy()
     df.set_index('job_candidate_id', inplace=True)
@@ -65,13 +73,8 @@ def _create_updated_df(tech_tracker_df, mot_df):
     return df
 
 
-def _get_cleaned_tech_tracker_df(worksheet):
-    pass
-
-
-def _get_cleaned_mot_df():
+def _get_cleaned_mot_df(hr_mot_sheet):
     # Todo: update hr_mot_sheet for prod
-    hr_mot_sheet = _create_sheet_connection(HR_MOT_SHEET, "Master_22-23")
     mot_df = hr_mot_sheet.get_as_df(start=(3, 1), end=(hr_mot_sheet.rows, 56), has_header=False,
                                     include_tailing_empty=False)
     mot_df = mot_df.rename(columns=COLUMN_MAPPINGS)
@@ -107,8 +110,34 @@ def get_new_records(tracker_df, mot_df):
         on=["job_candidate_id"]).query('_merge=="left_only"')
     result.drop(["_merge"], axis=1, inplace=True)
     if not result.empty:
+        result['Rescinded'] = '--'
         _fill_in_date_fields(result)
     return result
+
+
+def _get_rescinded_offers(hr_mot_wksht):
+    """HR strikesthrough rescinded offers"""
+    rescinded_offer_ids = list()
+    col = hr_mot_wksht.get_col(4, include_tailing_empty=False, returnas='cell')
+    for cell in col[2:]:
+        if cell is not None:
+            if cell.text_format is not None:
+                strike_through = cell.text_format.get('strikethrough', False)
+                if strike_through:
+                    rescinded_offer_ids.append(cell.value_unformatted)
+
+    return rescinded_offer_ids
+
+
+def _update_rescinded_col(id_list, df):
+    filtered_for_updates = df.loc[(df['job_candidate_id'].isin(id_list)) & (df['Rescinded'] == '--')]
+    if not filtered_for_updates.empty:
+        filtered_for_updates['Rescinded'] = f'Yes - {date.today()}'
+        filtered_for_updates.set_index('job_candidate_id', inplace=True)
+        df.set_index('job_candidate_id', inplace=True)
+        df.update(filtered_for_updates)
+        df.reset_index(inplace=True)
+    return df
 
 
 def _compare_dfs(updated_tracker_df, old_tracker_df):
@@ -145,26 +174,32 @@ def _evaluate_datapoints(x, new_v, old_v):
 
 def calculate_main_updated_date(df):
     # df.where(df["Start Date - Last Updated"] > df["Pay Location - Last Updated"], )
-    df['Main Last Updated'] = np.where((df['Start Date - Last Updated'] <= df["Pay Location - Last Updated"]), df["Pay Location - Last Updated"], df['Start Date - Last Updated'])
+    df['Main Last Updated'] = np.where((df['Start Date - Last Updated'] <= df["Pay Location - Last Updated"]),
+                                       df["Pay Location - Last Updated"], df['Start Date - Last Updated'])
 
 
 def main():
     # getting tech worksheet and DFs
     # Todo: update tech_tracker_sheet for prod
-    tech_tracker_sheet = _create_sheet_connection(TECH_TRACKER_SHEET, "Prototype")
-    tracker_backup_df = tech_tracker_sheet.get_as_df(has_header=True, start=(2, 1), end=(tech_tracker_sheet.rows, 18),
+    tech_tracker_sheet = _create_sheet_connection(TECH_TRACKER_SHEET, "2022-23 Tracker")
+    tracker_backup_df = tech_tracker_sheet.get_as_df(has_header=True, start="B4", end=(tech_tracker_sheet.rows, 19),
                                                      include_tailing_empty=False)
     tracker_backup_df.astype(str)
-    tracker_backup_df['Start Date - Last Updated'] = pd.to_datetime(tracker_backup_df['Start Date - Last Updated'], format="%Y-%m-%d").dt.date
-    tracker_backup_df['Pay Location - Last Updated'] = pd.to_datetime(tracker_backup_df['Pay Location - Last Updated'], format="%Y-%m-%d").dt.date
+    tracker_backup_df['Start Date - Last Updated'] = pd.to_datetime(tracker_backup_df['Start Date - Last Updated'],
+                                                                    format="%Y-%m-%d").dt.date
+    tracker_backup_df['Pay Location - Last Updated'] = pd.to_datetime(tracker_backup_df['Pay Location - Last Updated'],
+                                                                      format="%Y-%m-%d").dt.date
     #  print('\nTRACKER DATA')
     #  print(f'{tracker_backup_df.to_string()}')
     # date_cols = [col for col in tracker_backup_df.columns.tolist() if col not in string_cols]
     # tracker_backup_df[date_cols] = pd.to_datetime(tracker_backup_df[date_cols], format='%d-%m-%Y')
-    hr_mot_df = _get_cleaned_mot_df()
+    hr_mot_sheet = _create_sheet_connection(HR_MOT_SHEET, "Master_22-23")
+    rescinded_offer_ids = _get_rescinded_offers(hr_mot_sheet)
+    hr_mot_df = _get_cleaned_mot_df(hr_mot_sheet)
     hr_mot_df.astype(str)
     #  print('\nMOT DATA')
     #  print(f'{hr_mot_df.to_string()}')
+    updated_tracker_df = pd.DataFrame()
 
     if not tracker_backup_df.empty:
         updated_tracker_df = _create_updated_df(tracker_backup_df, hr_mot_df)
@@ -176,17 +211,16 @@ def main():
         # Todo: will need to update 'tracker_backup_df' from below
         updated_tracker_df = pd.concat([updated_tracker_df, new_records])
 
-    tech_tracker_sheet.set_dataframe(updated_tracker_df, (3, 1), copy_head=False)
-    sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
-    tech_tracker_sheet.sort_range('A3', sheet_dim, basecolumnindex=17, sortorder='DESCENDING')
-    # combined_df = pd.concat([tracker_updated_df, new_records])
-    # tech_tracker_sheet.set_dataframe(combined_df, (2, 1), copy_head=False)
-    #  tracker_updated_df.set_index()
-    #  tracker_updated_df.update(hr_mot_df)
+    if rescinded_offer_ids:
+        _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
 
-    #  rescind_df = main_hr_mot_df.iloc[:, [0, 52, 53]].copy()
-    #  rescind_df.where("rescind" in rescind_df, inplace=True)
-    #  print(rescind_df.to_string())
+    if not updated_tracker_df.empty:
+        # ToDo: Log this, and log if nothing is updated
+        tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
+        sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
+        tech_tracker_sheet.sort_range('B5', sheet_dim, basecolumnindex=18, sortorder='DESCENDING')
+
+    create_tracker_updated_timestamp(tech_tracker_sheet)
 
 
 if __name__ == "__main__":
