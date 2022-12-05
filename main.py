@@ -117,8 +117,19 @@ def get_new_records(tracker_df, mot_df):
     return result
 
 
+def filter_out_cleared_on_boarders(cleared_ids_df, tech_tracker_df) -> pd.DataFrame:
+    result = pd.merge(
+        tech_tracker_df,
+        cleared_ids_df,
+        indicator=True,
+        how="outer",
+        on=["job_candidate_id"]).query('_merge=="left_only"')
+    result.drop(["_merge"], axis=1, inplace=True)
+    return result
+
+
 def _get_rescinded_offers(hr_mot_wksht):
-    """HR strikesthrough rescinded offers"""
+    """HR strikesthrough rescinded offers; this func evaluates for this"""
     rescinded_offer_ids = list()
     col = hr_mot_wksht.get_col(4, include_tailing_empty=False, returnas='cell')
     for cell in col[2:]:
