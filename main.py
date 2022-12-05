@@ -1,8 +1,9 @@
-from datetime import date
+from datetime import date, datetime
 import logging
 import os
 import sys
 from typing import Union
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -55,6 +56,13 @@ def _create_sheet_connection(sheet_key: str, worksheet_name: str) -> Union[Works
     return worksheet
 
 
+def create_tracker_updated_timestamp(tracker: Worksheet) -> None:
+    timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
+    d_stamp = timestamp.strftime('%x')
+    t_stamp = timestamp.strftime('%-I:%M %p')
+    tracker.update_value('A2', f'LAST UPDATED: {d_stamp} @ {t_stamp}')
+
+
 def _create_updated_df(tech_tracker_df, mot_df):
     df = tech_tracker_df.copy()
     df.set_index('job_candidate_id', inplace=True)
@@ -63,10 +71,6 @@ def _create_updated_df(tech_tracker_df, mot_df):
     df.reset_index(inplace=True)
     df.drop(columns=['Start Date - Last Updated', 'Pay Location - Last Updated', 'Main Last Updated'])
     return df
-
-
-def _get_cleaned_tech_tracker_df(worksheet):
-    pass
 
 
 def _get_cleaned_mot_df(hr_mot_sheet):
@@ -209,18 +213,14 @@ def main():
 
     if rescinded_offer_ids:
         _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
-        logger.info(f'{updated_tracker_df.to_string()}')
-    tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
-    sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
-    tech_tracker_sheet.sort_range('B5', sheet_dim, basecolumnindex=18, sortorder='DESCENDING')
-    # combined_df = pd.concat([tracker_updated_df, new_records])
-    # tech_tracker_sheet.set_dataframe(combined_df, (2, 1), copy_head=False)
-    #  tracker_updated_df.set_index()
-    #  tracker_updated_df.update(hr_mot_df)
 
-    #  rescind_df = main_hr_mot_df.iloc[:, [0, 52, 53]].copy()
-    #  rescind_df.where("rescind" in rescind_df, inplace=True)
-    #  print(rescind_df.to_string())
+    if not updated_tracker_df.empty:
+        # ToDo: Log this, and log if nothing is updated
+        tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
+        sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
+        tech_tracker_sheet.sort_range('B5', sheet_dim, basecolumnindex=18, sortorder='DESCENDING')
+
+    create_tracker_updated_timestamp(tech_tracker_sheet)
 
 
 if __name__ == "__main__":
