@@ -187,35 +187,42 @@ def get_sheet_names():
     pass
 
 
+def get_and_prep_tracker_df(tracker_worksheet):
+    df = tracker_worksheet.get_as_df(has_header=True, start="B4", end=(tracker_worksheet.rows, 19),
+                                     include_tailing_empty=False)
+    df.astype(str)
+    df['Start Date - Last Updated'] = pd.to_datetime(tracker_backup_df['Start Date - Last Updated'],
+                                                                    format="%Y-%m-%d").dt.date
+    df['Pay Location - Last Updated'] = pd.to_datetime(tracker_backup_df['Pay Location - Last Updated'],
+                                                                      format="%Y-%m-%d").dt.date
+    return df
+
+
+def get_cleared_ids():
+    cleared_sheet = _create_sheet_connection(TECH_TRACKER_SHEET, f"{SCHOOL_YEAR} Cleared")
+    return cleared_sheet.get_as_df(has_header=True, start="B4", end=(cleared_sheet.rows, 2),
+                                   include_tailing_empty=False)
+
+
 def main():
     # getting tech worksheet and DFs
     # Todo: update tech_tracker_sheet for prod
     tech_tracker_sheet = _create_sheet_connection(TECH_TRACKER_SHEET, f"{SCHOOL_YEAR} Tracker")
-    tracker_backup_df = tech_tracker_sheet.get_as_df(has_header=True, start="B4", end=(tech_tracker_sheet.rows, 19),
-                                                     include_tailing_empty=False)
-    tracker_backup_df.astype(str)
-    tracker_backup_df['Start Date - Last Updated'] = pd.to_datetime(tracker_backup_df['Start Date - Last Updated'],
-                                                                    format="%Y-%m-%d").dt.date
-    tracker_backup_df['Pay Location - Last Updated'] = pd.to_datetime(tracker_backup_df['Pay Location - Last Updated'],
-                                                                      format="%Y-%m-%d").dt.date
 
-    # Filter out cleared tracker folx
-    cleared_sheet = _create_sheet_connection(TECH_TRACKER_SHEET, f"{SCHOOL_YEAR} Cleared")
-    cleared_ids_df = cleared_sheet.get_as_df(has_header=True, start="B4", end=(cleared_sheet.rows, 2),
-                                             include_tailing_empty=False)
+    tracker_backup_df = get_and_prep_tracker_df(tech_tracker_sheet)
 
     hr_mot_sheet = _create_sheet_connection(HR_MOT_SHEET, f"Master_{SCHOOL_YEAR}")
     rescinded_offer_ids = _get_rescinded_offers(hr_mot_sheet)
     hr_mot_df = _get_cleaned_mot_df(hr_mot_sheet)
-    hr_mot_df.astype(str)
 
+    cleared_ids_df = get_cleared_ids()
     hr_mot_df = filter_out_cleared_on_boarders(cleared_ids_df, hr_mot_df)
 
     updated_tracker_df = pd.DataFrame()
 
     if not tracker_backup_df.empty:
         updated_tracker_df = _create_updated_df(tracker_backup_df, hr_mot_df)
-        updated_tracker_df = _compare_dfs(updated_tracker_df, tracker_backup_df)  # ToDo: Rename this
+        updated_tracker_df = _compare_dfs(updated_tracker_df, tracker_backup_df)
         calculate_main_updated_date(updated_tracker_df)
 
     new_records = get_new_records(tracker_backup_df, hr_mot_df)
