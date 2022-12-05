@@ -9,10 +9,15 @@ import numpy as np
 import pandas as pd
 from pygsheets import authorize, Worksheet
 
+from utils.arg_parser import create_parser
 
 DEBUG = int(os.getenv("DEBUG", default=0))
 TECH_TRACKER_SHEET = os.getenv("TECH_TRACKER_SHEETS_ID")
 HR_MOT_SHEET = os.getenv("HR_MOT_SHEETS_ID")
+
+# Crete Parser
+parser = create_parser().parse_args()
+SCHOOL_YEAR = parser.school_year[0]
 
 logging.basicConfig(
     handlers=[
@@ -38,14 +43,11 @@ COLUMN_MAPPINGS = {
     1: 'New, Returners, Rehire or Transfer',
     15: 'SpEd',
     50: 'Cleared?',
-    51: 'Cleared Email Sent',
-#    54: 'Rescinded'
+    51: 'Cleared Email Sent'
 }
 
 
 def _create_sheet_connection(sheet_key: str, worksheet_name: str) -> Union[Worksheet, None]:
-    # pygsheets.exceptions.WorksheetNotFound
-    # googleapiclient.errors.HttpError
     worksheet = None
     try:
         client = authorize(service_file='./service_account_credentials.json')
@@ -160,28 +162,24 @@ def _merge_for_comparison(updated_tracker_df, old_tracker_df, col):
     old_value = f"{col}_y"
     update_date_field = f"{col} - Last Updated_x"
     results = results[['job_candidate_id', new_value, old_value, update_date_field]]
-    #  print(results.head())
     results.loc[results[new_value] != results[old_value], update_date_field] = date.today()
-    #  print(results.head())
-    # results[['job_candidate_id', update_date_field]]
     results.rename(columns={update_date_field: update_date_field[:-2]}, inplace=True)
     return results
 
 
-def _evaluate_datapoints(x, new_v, old_v):
-    pass
-
-
 def calculate_main_updated_date(df):
-    # df.where(df["Start Date - Last Updated"] > df["Pay Location - Last Updated"], )
     df['Main Last Updated'] = np.where((df['Start Date - Last Updated'] <= df["Pay Location - Last Updated"]),
                                        df["Pay Location - Last Updated"], df['Start Date - Last Updated'])
+
+
+def get_sheet_names():
+    pass
 
 
 def main():
     # getting tech worksheet and DFs
     # Todo: update tech_tracker_sheet for prod
-    tech_tracker_sheet = _create_sheet_connection(TECH_TRACKER_SHEET, "2022-23 Tracker")
+    tech_tracker_sheet = _create_sheet_connection(TECH_TRACKER_SHEET, f"{SCHOOL_YEAR} Tracker")
     tracker_backup_df = tech_tracker_sheet.get_as_df(has_header=True, start="B4", end=(tech_tracker_sheet.rows, 19),
                                                      include_tailing_empty=False)
     tracker_backup_df.astype(str)
@@ -189,21 +187,24 @@ def main():
                                                                     format="%Y-%m-%d").dt.date
     tracker_backup_df['Pay Location - Last Updated'] = pd.to_datetime(tracker_backup_df['Pay Location - Last Updated'],
                                                                       format="%Y-%m-%d").dt.date
-    #  print('\nTRACKER DATA')
-    #  print(f'{tracker_backup_df.to_string()}')
-    # date_cols = [col for col in tracker_backup_df.columns.tolist() if col not in string_cols]
-    # tracker_backup_df[date_cols] = pd.to_datetime(tracker_backup_df[date_cols], format='%d-%m-%Y')
-    hr_mot_sheet = _create_sheet_connection(HR_MOT_SHEET, "Master_22-23")
+
+    # Filter out cleared tracker folx
+    cleared_sheet = _create_sheet_connection(TECH_TRACKER_SHEET, f"{SCHOOL_YEAR} Cleared")
+    cleared_ids_df = cleared_sheet.get_as_df(has_header=True, start="B4", end=(cleared_sheet.rows, 2),
+                                             include_tailing_empty=False)
+
+    hr_mot_sheet = _create_sheet_connection(HR_MOT_SHEET, f"Master_{SCHOOL_YEAR}")
     rescinded_offer_ids = _get_rescinded_offers(hr_mot_sheet)
     hr_mot_df = _get_cleaned_mot_df(hr_mot_sheet)
     hr_mot_df.astype(str)
-    #  print('\nMOT DATA')
-    #  print(f'{hr_mot_df.to_string()}')
+
+    hr_mot_df = filter_out_cleared_on_boarders(cleared_ids_df, hr_mot_df)
+
     updated_tracker_df = pd.DataFrame()
 
     if not tracker_backup_df.empty:
         updated_tracker_df = _create_updated_df(tracker_backup_df, hr_mot_df)
-        updated_tracker_df = _compare_dfs(updated_tracker_df, tracker_backup_df)  #  ToDo: Rename this
+        updated_tracker_df = _compare_dfs(updated_tracker_df, tracker_backup_df)  # ToDo: Rename this
         calculate_main_updated_date(updated_tracker_df)
 
     new_records = get_new_records(tracker_backup_df, hr_mot_df)

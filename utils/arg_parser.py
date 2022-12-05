@@ -6,9 +6,8 @@ def create_parser():
     parser.add_argument(
         "--school-year",
         dest="school_year",
-        help="School year in YYYY-YY format; ex. '2022-23'",
-        action="store_true"
+        help="School year in YY-YY format; ex. '22-23'",
+        nargs=1
     )
 
     return parser
-
