@@ -10,8 +10,8 @@ import pandas as pd
 from pygsheets import authorize, Worksheet
 
 from utils.arg_parser import create_parser
+from utils.logger_config import get_logger
 
-DEBUG = int(os.getenv("DEBUG", default=0))
 TECH_TRACKER_SHEET = os.getenv("TECH_TRACKER_SHEETS_ID")
 HR_MOT_SHEET = os.getenv("HR_MOT_SHEETS_ID")
 
@@ -19,16 +19,7 @@ HR_MOT_SHEET = os.getenv("HR_MOT_SHEETS_ID")
 parser = create_parser().parse_args()
 SCHOOL_YEAR = parser.school_year[0]
 
-logging.basicConfig(
-    handlers=[
-        logging.FileHandler(filename="./app.log", mode="w+"),
-        logging.StreamHandler(sys.stdout),
-    ],
-    level=logging.DEBUG if DEBUG else logging.INFO,
-    format="%(asctime)s | %(levelname)s: %(message)s",
-    datefmt="%Y-%m-%d %I:%M:%S%p %Z",
-)
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 COLUMN_MAPPINGS = {
     3: 'job_candidate_id',
@@ -183,18 +174,14 @@ def calculate_main_updated_date(df):
                                        df["Pay Location - Last Updated"], df['Start Date - Last Updated'])
 
 
-def get_sheet_names():
-    pass
-
-
 def get_and_prep_tracker_df(tracker_worksheet):
     df = tracker_worksheet.get_as_df(has_header=True, start="B4", end=(tracker_worksheet.rows, 19),
                                      include_tailing_empty=False)
     df.astype(str)
     df['Start Date - Last Updated'] = pd.to_datetime(tracker_backup_df['Start Date - Last Updated'],
-                                                                    format="%Y-%m-%d").dt.date
+                                                     format="%Y-%m-%d").dt.date
     df['Pay Location - Last Updated'] = pd.to_datetime(tracker_backup_df['Pay Location - Last Updated'],
-                                                                      format="%Y-%m-%d").dt.date
+                                                       format="%Y-%m-%d").dt.date
     return df
 
 
@@ -224,23 +211,30 @@ def main():
         updated_tracker_df = _create_updated_df(tracker_backup_df, hr_mot_df)
         updated_tracker_df = _compare_dfs(updated_tracker_df, tracker_backup_df)
         calculate_main_updated_date(updated_tracker_df)
+        logging.info('Updating Tracker')
 
     new_records = get_new_records(tracker_backup_df, hr_mot_df)
     if not new_records.empty:
-        # Todo: will need to update 'tracker_backup_df' from below
         updated_tracker_df = pd.concat([updated_tracker_df, new_records])
+        logging.info(f'Adding {len(new_records)} new records to tracker')
 
     if rescinded_offer_ids:
         _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
 
     if not updated_tracker_df.empty:
-        # ToDo: Log this, and log if nothing is updated
         tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
         sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
         tech_tracker_sheet.sort_range('B5', sheet_dim, basecolumnindex=18, sortorder='DESCENDING')
+        logger.info('Refreshed Tech Tracker')
+    else:
+        logger.info('No updates found. Nothing to refresh.')
 
     create_tracker_updated_timestamp(tech_tracker_sheet)
 
 
 if __name__ == "__main__":
-    main()
+    logger.info(f'Working on tracker for year {SCHOOL_YEAR}')
+    try:
+        main()
+    except Exception:
+        pass
