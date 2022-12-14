@@ -2,6 +2,7 @@ from datetime import date, datetime
 import logging
 import os
 import sys
+import traceback
 from typing import Union
 from zoneinfo import ZoneInfo
 
@@ -69,7 +70,7 @@ def _create_updated_df(tech_tracker_df, mot_df):
 
 def _get_cleaned_mot_df(hr_mot_sheet):
     # Todo: update hr_mot_sheet for prod
-    mot_df = hr_mot_sheet.get_as_df(start=(3, 1), end=(hr_mot_sheet.rows, 56), has_header=False,
+    mot_df = hr_mot_sheet.get_as_df(start=(3, 1), end=(hr_mot_sheet.rows, hr_mot_sheet.cols), has_header=False,
                                     include_tailing_empty=False)
     mot_df = mot_df.rename(columns=COLUMN_MAPPINGS)
 
@@ -179,10 +180,8 @@ def get_and_prep_tracker_df(tracker_worksheet):
     df = tracker_worksheet.get_as_df(has_header=True, start="B4", end=(tracker_worksheet.rows, 19),
                                      include_tailing_empty=False)
     df.astype(str)
-    df['Start Date - Last Updated'] = pd.to_datetime(tracker_backup_df['Start Date - Last Updated'],
-                                                     format="%Y-%m-%d").dt.date
-    df['Pay Location - Last Updated'] = pd.to_datetime(tracker_backup_df['Pay Location - Last Updated'],
-                                                       format="%Y-%m-%d").dt.date
+    df['Start Date - Last Updated'] = pd.to_datetime(df['Start Date - Last Updated'], format="%Y-%m-%d").dt.date
+    df['Pay Location - Last Updated'] = pd.to_datetime(df['Pay Location - Last Updated'], format="%Y-%m-%d").dt.date
     return df
 
 
@@ -193,8 +192,6 @@ def get_cleared_ids():
 
 
 def main():
-    # getting tech worksheet and DFs
-    # Todo: update tech_tracker_sheet for prod
     tech_tracker_sheet = _create_sheet_connection(TECH_TRACKER_SHEET, f"{SCHOOL_YEAR} Tracker")
 
     tracker_backup_df = get_and_prep_tracker_df(tech_tracker_sheet)
