@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from pygsheets import authorize, Worksheet
 
+from mailer import Mailer
 from utils.arg_parser import create_parser
 from utils.logger_config import get_logger
 
@@ -233,8 +234,12 @@ def main():
 
 
 if __name__ == "__main__":
+    mailer = Mailer("Tech On-boarding Tracker")
     logger.info(f'Working on tracker for year {SCHOOL_YEAR}')
     try:
         main()
-    except Exception:
-        pass
+        mailer.notify()
+    except Exception as e:
+        stack_trace = traceback.format_exc()
+        logging.error(stack_trace)
+        mailer.notify(success=False)
