@@ -10,12 +10,13 @@ import numpy as np
 import pandas as pd
 from pygsheets import authorize, Worksheet
 
-from mailer import Mailer
 from utils.arg_parser import create_parser
 from utils.logger_config import get_logger
+from utils.mailer import Mailer
 
 TECH_TRACKER_SHEET = os.getenv("TECH_TRACKER_SHEETS_ID")
 HR_MOT_SHEET = os.getenv("HR_MOT_SHEETS_ID")
+GOOGLE_CREDENTIALS = os.getenv("CREDENTIALS_FILE")
 
 # Crete Parser
 parser = create_parser().parse_args()
@@ -43,7 +44,7 @@ COLUMN_MAPPINGS = {
 def _create_sheet_connection(sheet_key: str, worksheet_name: str) -> Union[Worksheet, None]:
     worksheet = None
     try:
-        client = authorize(service_file='./service_account_credentials.json')
+        client = authorize(service_file=GOOGLE_CREDENTIALS)
         sheet = client.open_by_key(sheet_key)
         worksheet = sheet.worksheet_by_title(worksheet_name)
     except Exception as e:
@@ -209,14 +210,19 @@ def main():
         updated_tracker_df = _create_updated_df(tracker_backup_df, hr_mot_df)
         updated_tracker_df = _compare_dfs(updated_tracker_df, tracker_backup_df)
         calculate_main_updated_date(updated_tracker_df)
-        logging.info('Updating Tracker')
+        logging.info('Updating Tech Tracker with data from HR\'s MOT')
+    else:
+        logging.info('Tech Tracker is empty')
 
     new_records = get_new_records(tracker_backup_df, hr_mot_df)
     if not new_records.empty:
         updated_tracker_df = pd.concat([updated_tracker_df, new_records])
         logging.info(f'Adding {len(new_records)} new records to tracker')
+    else:
+        logging.info('No new records to add to Tech Tracker')
 
     if rescinded_offer_ids:
+        logging.info('Checking for rescinded offers')
         _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
 
     if not updated_tracker_df.empty:
@@ -231,7 +237,7 @@ def main():
 
 
 if __name__ == "__main__":
-    mailer = Mailer("Tech On-boarding Tracker")
+    mailer = Mailer(f"Tech On-boarding Tracker - {SCHOOL_YEAR}")
     logger.info(f'Working on tracker for year {SCHOOL_YEAR}')
     try:
         main()
