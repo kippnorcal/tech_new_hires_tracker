@@ -1,4 +1,6 @@
 import logging
+import os
+import sys
 
 
 def get_logger():
@@ -9,7 +11,7 @@ def get_logger():
             logging.FileHandler(filename="app.log", mode="w+"),
             logging.StreamHandler(sys.stdout),
         ],
-        level=logging.DEBUG if bebug else logging.INFO,
+        level=logging.DEBUG if debug else logging.INFO,
         format="%(asctime)s | %(levelname)s: %(message)s",
         datefmt="%Y-%m-%d %I:%M:%S%p %Z",
     )
