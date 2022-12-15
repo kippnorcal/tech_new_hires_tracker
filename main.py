@@ -41,15 +41,11 @@ COLUMN_MAPPINGS = {
 }
 
 
-def _create_sheet_connection(sheet_key: str, worksheet_name: str) -> Union[Worksheet, None]:
-    worksheet = None
-    try:
-        client = authorize(service_file=GOOGLE_CREDENTIALS)
-        sheet = client.open_by_key(sheet_key)
-        worksheet = sheet.worksheet_by_title(worksheet_name)
-    except Exception as e:
-        logger.warning(e)
-    return worksheet
+def _create_sheet_connection(sheet_key: str, worksheet_name: str) -> Worksheet:
+    client = authorize(service_file=GOOGLE_CREDENTIALS)
+    sheet = client.open_by_key(sheet_key)
+    return sheet.worksheet_by_title(worksheet_name)
+
 
 
 def create_tracker_updated_timestamp(tracker: Worksheet) -> None:
