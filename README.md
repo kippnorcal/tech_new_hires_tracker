@@ -40,7 +40,7 @@ NOTIF_TO_ADDRESS=
 The connector will need a .json credential file. The path to this file lives in teh .env file. For more information about setting up Google Authentication, check out the [pygsheets documentation](https://pygsheets.readthedocs.io/en/stable/authorization.html) on it.
 
 ## Running the Connector
-Navigate to repo's directory and build Docker image
+From the repo's directory, build Docker image
 ``````
 docker build -t tech-tracker-connector .
 ``````
@@ -50,5 +50,5 @@ docker build -t tech-tracker-connector . --platform linux/amd64
 ``````
 There is a required runtime argument `--school-year` that accepts year in a XX-XX format.
 ``````
-docker run tech-tracker-connector
+docker run tech-tracker-connector --school-year 23-24
 ``````
