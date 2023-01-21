@@ -183,7 +183,7 @@ def get_and_prep_tracker_df(tracker_worksheet):
 
 def get_cleared_ids():
     cleared_sheet = create_sheet_connection(TECH_TRACKER_SHEET, f"{SCHOOL_YEAR} Cleared")
-    return cleared_sheet.get_as_df(has_header=True, start="B4", end=(cleared_sheet.rows, 2),
+    return cleared_sheet.get_as_df(has_header=True, start="C4", end=(cleared_sheet.rows, 3),
                                    include_tailing_empty=False)
 
 
