@@ -124,10 +124,8 @@ def get_rescinded_offers(hr_mot_wksht):
     for cell in col[2:]:
         if cell is not None:
             if cell.text_format is not None:
-                strike_through = cell.text_format.get('strikethrough', False)
-                if strike_through:
+                if cell.text_format.get('strikethrough', False):
                     rescinded_offer_ids.append(cell.value_unformatted)
-
     return rescinded_offer_ids
 
 
