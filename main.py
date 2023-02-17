@@ -1,9 +1,7 @@
 from datetime import date, datetime
 import logging
 import os
-import sys
 import traceback
-from typing import Union
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -18,7 +16,7 @@ TECH_TRACKER_SHEET = os.getenv("TECH_TRACKER_SHEETS_ID")
 HR_MOT_SHEET = os.getenv("HR_MOT_SHEETS_ID")
 GOOGLE_CREDENTIALS = os.getenv("CREDENTIALS_FILE")
 
-# Crete Parser
+# Create Parser
 parser = create_parser().parse_args()
 SCHOOL_YEAR = parser.school_year[0]
 
@@ -48,14 +46,14 @@ def create_sheet_connection(sheet_key: str, worksheet_name: str) -> Worksheet:
     return sheet.worksheet_by_title(worksheet_name)
 
 
-def create_tracker_updated_timestamp(tracker: Worksheet) -> None:
+def create_tracker_updated_timestamp(tracker_worksheet) -> None:
     timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
     d_stamp = timestamp.strftime('%x')
     t_stamp = timestamp.strftime('%-I:%M %p')
-    tracker.update_value('A2', f'LAST UPDATED: {d_stamp} @ {t_stamp}')
+    tracker_worksheet.update_value('A2', f'LAST UPDATED: {d_stamp} @ {t_stamp}')
 
 
-def create_updated_df(tech_tracker_df, mot_df):
+def create_updated_df(tech_tracker_df, mot_df) -> pd.DataFrame:
     df = tech_tracker_df.copy()
     df.set_index('job_candidate_id', inplace=True)
     mot_df.set_index('job_candidate_id', inplace=True)
@@ -65,9 +63,9 @@ def create_updated_df(tech_tracker_df, mot_df):
     return df
 
 
-def get_cleaned_mot_df(hr_mot_sheet):
-    mot_df = hr_mot_sheet.get_as_df(start=(3, 1), end=(hr_mot_sheet.rows, hr_mot_sheet.cols), has_header=False,
-                                    include_tailing_empty=False)
+def get_cleaned_mot_df(hr_mot_worksheet) -> pd.DataFrame:
+    mot_df = hr_mot_worksheet.get_as_df(start=(3, 1), end=(hr_mot_worksheet.rows, hr_mot_worksheet.cols),
+                                        has_header=False, include_tailing_empty=False)
     mot_df = mot_df.rename(columns=COLUMN_MAPPINGS)
 
     #  Filtering unneeded columns
@@ -83,7 +81,7 @@ def get_cleaned_mot_df(hr_mot_sheet):
     return mot_df
 
 
-def fill_in_date_fields(df):
+def fill_in_date_fields(df) -> None:
     today = date.today()
     df['Date Added'] = today
     df['Start Date - Last Updated'] = today
@@ -91,7 +89,7 @@ def fill_in_date_fields(df):
     df['Main Last Updated'] = today
 
 
-def get_new_records(tracker_df, mot_df):
+def get_new_records(tracker_df, mot_df) -> pd.DataFrame:
     ids_df = tracker_df[["job_candidate_id"]].copy()
     result = pd.merge(
         mot_df,
@@ -117,10 +115,10 @@ def filter_out_cleared_on_boarders(cleared_ids_df, tech_tracker_df) -> pd.DataFr
     return result
 
 
-def get_rescinded_offers(hr_mot_wksht):
+def get_rescinded_offers(hr_mot_worksheet) -> list:
     """HR strikesthrough rescinded offers; this func evaluates for this"""
     rescinded_offer_ids = list()
-    col = hr_mot_wksht.get_col(4, include_tailing_empty=False, returnas='cell')
+    col = hr_mot_worksheet.get_col(4, include_tailing_empty=False, returnas='cell')
     for cell in col[2:]:
         if cell is not None:
             if cell.text_format is not None:
@@ -129,7 +127,7 @@ def get_rescinded_offers(hr_mot_wksht):
     return rescinded_offer_ids
 
 
-def update_rescinded_col(id_list, df):
+def update_rescinded_col(id_list, df) -> pd.DataFrame:
     filtered_for_updates = df.loc[(df['job_candidate_id'].isin(id_list)) & (df['Rescinded'] == '--')]
     if not filtered_for_updates.empty:
         filtered_for_updates['Rescinded'] = f'Yes - {date.today()}'
@@ -140,16 +138,15 @@ def update_rescinded_col(id_list, df):
     return df
 
 
-def compare_dfs(updated_tracker_df, old_tracker_df):
+def compare_dfs(updated_tracker_df, old_tracker_df) -> pd.DataFrame:
     cols_to_compare = ['Start Date', 'Pay Location']
     for col in cols_to_compare:
         df_compared = merge_for_comparison(updated_tracker_df, old_tracker_df, col)
         updated_tracker_df = create_updated_df(updated_tracker_df, df_compared)
-
     return updated_tracker_df
 
 
-def merge_for_comparison(updated_tracker_df, old_tracker_df, col):
+def merge_for_comparison(updated_tracker_df, old_tracker_df, col: str) -> pd.DataFrame:
     results = pd.merge(
         updated_tracker_df,
         old_tracker_df,
@@ -165,12 +162,12 @@ def merge_for_comparison(updated_tracker_df, old_tracker_df, col):
     return results
 
 
-def calculate_main_updated_date(df):
+def calculate_main_updated_date(df) -> None:
     df['Main Last Updated'] = np.where((df['Start Date - Last Updated'] <= df["Pay Location - Last Updated"]),
                                        df["Pay Location - Last Updated"], df['Start Date - Last Updated'])
 
 
-def get_and_prep_tracker_df(tracker_worksheet):
+def get_and_prep_tracker_df(tracker_worksheet) -> pd.DataFrame:
     # Sort range first to eliminate possible blank rows
     tracker_worksheet.sort_range(start="B5", end=(tracker_worksheet.rows, tracker_worksheet.cols), basecolumnindex=2)
     df = tracker_worksheet.get_as_df(has_header=True, start="B4", end=(tracker_worksheet.rows, 19),
@@ -181,7 +178,7 @@ def get_and_prep_tracker_df(tracker_worksheet):
     return df
 
 
-def get_cleared_ids():
+def get_cleared_ids() -> pd.DataFrame:
     cleared_sheet = create_sheet_connection(TECH_TRACKER_SHEET, f"{SCHOOL_YEAR} Cleared")
     return cleared_sheet.get_as_df(has_header=True, start="C4", end=(cleared_sheet.rows, 3),
                                    include_tailing_empty=False)
