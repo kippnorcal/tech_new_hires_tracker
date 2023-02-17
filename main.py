@@ -24,17 +24,18 @@ SCHOOL_YEAR = parser.school_year[0]
 
 logger = get_logger()
 
+# The order of the columns below determines the order in the Tech Tracker
 COLUMN_MAPPINGS = {
     3: 'job_candidate_id',
     4: 'First Name',
     5: 'Last Name',
+    1: 'New, Returners, Rehire or Transfer',
     19: 'Personal Email',
     7: 'Work Location',
     8: 'Pay Location',
     9: 'Start Date',
     13: 'Title',
     16: 'Former or Current KIPP',
-    1: 'New, Returners, Rehire or Transfer',
     15: 'SpEd',
     50: 'Cleared?',
     51: 'Cleared Email Sent'
