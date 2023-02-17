@@ -171,6 +171,8 @@ def calculate_main_updated_date(df):
 
 
 def get_and_prep_tracker_df(tracker_worksheet):
+    # Sort range first to eliminate possible blank rows
+    tracker_worksheet.sort_range(start="B5", end=(tracker_worksheet.rows, tracker_worksheet.cols), basecolumnindex=2)
     df = tracker_worksheet.get_as_df(has_header=True, start="B4", end=(tracker_worksheet.rows, 19),
                                      include_tailing_empty=False)
     df.astype(str)
