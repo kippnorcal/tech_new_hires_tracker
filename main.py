@@ -66,7 +66,6 @@ def create_updated_df(tech_tracker_df, mot_df):
 
 
 def get_cleaned_mot_df(hr_mot_sheet):
-    # Todo: update hr_mot_sheet for prod
     mot_df = hr_mot_sheet.get_as_df(start=(3, 1), end=(hr_mot_sheet.rows, hr_mot_sheet.cols), has_header=False,
                                     include_tailing_empty=False)
     mot_df = mot_df.rename(columns=COLUMN_MAPPINGS)
@@ -190,13 +189,14 @@ def get_cleared_ids():
 
 def main():
     tech_tracker_sheet = create_sheet_connection(TECH_TRACKER_SHEET, f"{SCHOOL_YEAR} Tracker")
-
     tracker_backup_df = get_and_prep_tracker_df(tech_tracker_sheet)
 
     hr_mot_sheet = create_sheet_connection(HR_MOT_SHEET, f"Master_{SCHOOL_YEAR}")
     rescinded_offer_ids = get_rescinded_offers(hr_mot_sheet)
     hr_mot_df = get_cleaned_mot_df(hr_mot_sheet)
 
+    # Tech Tracker has ability to clear onboarders who have completed onboarding to an archive sheet
+    # The below filters those onboarders out of the MOT dataset
     cleared_ids_df = get_cleared_ids()
     hr_mot_df = filter_out_cleared_on_boarders(cleared_ids_df, hr_mot_df)
 
