@@ -9,5 +9,11 @@ def create_parser():
         help="School year in YY-YY format; ex. '22-23'",
         nargs=1
     )
+    parser.add_argument(
+        "--sla-refresh",
+        dest="sla_monitor_refresh",
+        help="Refreshes Tech's SLA monitor data source",
+        action="store_true"
+    )
 
     return parser
