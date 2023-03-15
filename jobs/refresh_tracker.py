@@ -1,26 +1,17 @@
 from datetime import date, datetime
 import logging
 import os
-import traceback
 from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
-from pygsheets import authorize, Worksheet
-
-from utils.arg_parser import create_parser
-from utils.logger_config import get_logger
-from utils.mailer import Mailer
+from pygsheets import Spreadsheet, Worksheet
 
 TECH_TRACKER_SHEET = os.getenv("TECH_TRACKER_SHEETS_ID")
 HR_MOT_SHEET = os.getenv("HR_MOT_SHEETS_ID")
 GOOGLE_CREDENTIALS = os.getenv("CREDENTIALS_FILE")
 
-# Create Parser
-parser = create_parser().parse_args()
-SCHOOL_YEAR = parser.school_year[0]
-
-logger = get_logger()
+logger = logging.getLogger(__name__)
 
 # The order of the columns below determines the order in the Tech Tracker
 COLUMN_MAPPINGS = {
