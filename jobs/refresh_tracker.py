@@ -40,12 +40,6 @@ COLUMN_MAPPINGS = {
 }
 
 
-def create_sheet_connection(sheet_key: str, worksheet_name: str) -> Worksheet:
-    client = authorize(service_file=GOOGLE_CREDENTIALS)
-    sheet = client.open_by_key(sheet_key)
-    return sheet.worksheet_by_title(worksheet_name)
-
-
 def create_tracker_updated_timestamp(tracker_worksheet) -> None:
     timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
     d_stamp = timestamp.strftime('%x')
@@ -227,15 +221,3 @@ def main():
         logger.info('No updates found. Nothing to refresh.')
 
     create_tracker_updated_timestamp(tech_tracker_sheet)
-
-
-if __name__ == "__main__":
-    mailer = Mailer(f"Tech On-boarding Tracker - {SCHOOL_YEAR}")
-    logger.info(f'Working on tracker for year {SCHOOL_YEAR}')
-    try:
-        main()
-        mailer.notify()
-    except Exception as e:
-        stack_trace = traceback.format_exc()
-        logging.error(stack_trace)
-        mailer.notify(success=False)
