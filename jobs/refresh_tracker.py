@@ -31,14 +31,14 @@ COLUMN_MAPPINGS = {
 }
 
 
-def create_tracker_updated_timestamp(tracker_worksheet) -> None:
+def _create_tracker_updated_timestamp(tracker_worksheet) -> None:
     timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
     d_stamp = timestamp.strftime('%x')
     t_stamp = timestamp.strftime('%-I:%M %p')
     tracker_worksheet.update_value('A2', f'LAST UPDATED: {d_stamp} @ {t_stamp}')
 
 
-def create_updated_df(tech_tracker_df, mot_df) -> pd.DataFrame:
+def _create_updated_df(tech_tracker_df, mot_df) -> pd.DataFrame:
     df = tech_tracker_df.copy()
     df.set_index('job_candidate_id', inplace=True)
     mot_df.set_index('job_candidate_id', inplace=True)
@@ -48,7 +48,7 @@ def create_updated_df(tech_tracker_df, mot_df) -> pd.DataFrame:
     return df
 
 
-def get_cleaned_mot_df(hr_mot_worksheet) -> pd.DataFrame:
+def _get_cleaned_mot_df(hr_mot_worksheet) -> pd.DataFrame:
     mot_df = hr_mot_worksheet.get_as_df(start=(3, 1), end=(hr_mot_worksheet.rows, hr_mot_worksheet.cols),
                                         has_header=False, include_tailing_empty=False)
     mot_df = mot_df.rename(columns=COLUMN_MAPPINGS)
@@ -66,7 +66,7 @@ def get_cleaned_mot_df(hr_mot_worksheet) -> pd.DataFrame:
     return mot_df
 
 
-def fill_in_date_fields(df) -> None:
+def _fill_in_date_fields(df) -> None:
     today = date.today()
     df['Date Added'] = today
     df['Start Date - Last Updated'] = today
@@ -74,7 +74,7 @@ def fill_in_date_fields(df) -> None:
     df['Main Last Updated'] = today
 
 
-def get_new_records(tracker_df, mot_df) -> pd.DataFrame:
+def _get_new_records(tracker_df, mot_df) -> pd.DataFrame:
     ids_df = tracker_df[["job_candidate_id"]].copy()
     result = pd.merge(
         mot_df,
@@ -85,11 +85,11 @@ def get_new_records(tracker_df, mot_df) -> pd.DataFrame:
     result.drop(["_merge"], axis=1, inplace=True)
     if not result.empty:
         result['Rescinded'] = '--'
-        fill_in_date_fields(result)
+        _fill_in_date_fields(result)
     return result
 
 
-def filter_out_cleared_on_boarders(cleared_ids_df, tech_tracker_df) -> pd.DataFrame:
+def _filter_out_cleared_on_boarders(cleared_ids_df, tech_tracker_df) -> pd.DataFrame:
     result = pd.merge(
         tech_tracker_df,
         cleared_ids_df,
@@ -100,7 +100,7 @@ def filter_out_cleared_on_boarders(cleared_ids_df, tech_tracker_df) -> pd.DataFr
     return result
 
 
-def get_rescinded_offers(hr_mot_worksheet) -> list:
+def _get_rescinded_offers(hr_mot_worksheet) -> list:
     """HR strikesthrough rescinded offers; this func evaluates for this"""
     rescinded_offer_ids = list()
     col = hr_mot_worksheet.get_col(4, include_tailing_empty=False, returnas='cell')
@@ -112,7 +112,7 @@ def get_rescinded_offers(hr_mot_worksheet) -> list:
     return rescinded_offer_ids
 
 
-def update_rescinded_col(id_list, df) -> pd.DataFrame:
+def _update_rescinded_col(id_list, df) -> pd.DataFrame:
     filtered_for_updates = df.loc[(df['job_candidate_id'].isin(id_list)) & (df['Rescinded'] == '--')]
     if not filtered_for_updates.empty:
         filtered_for_updates['Rescinded'] = f'Yes - {date.today()}'
@@ -123,15 +123,15 @@ def update_rescinded_col(id_list, df) -> pd.DataFrame:
     return df
 
 
-def compare_dfs(updated_tracker_df, old_tracker_df) -> pd.DataFrame:
+def _compare_dfs(updated_tracker_df, old_tracker_df) -> pd.DataFrame:
     cols_to_compare = ['Start Date', 'Pay Location']
     for col in cols_to_compare:
-        df_compared = merge_for_comparison(updated_tracker_df, old_tracker_df, col)
-        updated_tracker_df = create_updated_df(updated_tracker_df, df_compared)
+        df_compared = _merge_for_comparison(updated_tracker_df, old_tracker_df, col)
+        updated_tracker_df = _create_updated_df(updated_tracker_df, df_compared)
     return updated_tracker_df
 
 
-def merge_for_comparison(updated_tracker_df, old_tracker_df, col: str) -> pd.DataFrame:
+def _merge_for_comparison(updated_tracker_df, old_tracker_df, col: str) -> pd.DataFrame:
     results = pd.merge(
         updated_tracker_df,
         old_tracker_df,
@@ -147,12 +147,12 @@ def merge_for_comparison(updated_tracker_df, old_tracker_df, col: str) -> pd.Dat
     return results
 
 
-def calculate_main_updated_date(df) -> None:
+def _calculate_main_updated_date(df) -> None:
     df['Main Last Updated'] = np.where((df['Start Date - Last Updated'] <= df["Pay Location - Last Updated"]),
                                        df["Pay Location - Last Updated"], df['Start Date - Last Updated'])
 
 
-def get_and_prep_tracker_df(tracker_worksheet) -> pd.DataFrame:
+def _get_and_prep_tracker_df(tracker_worksheet) -> pd.DataFrame:
     # Sort range first to eliminate possible blank rows
     tracker_worksheet.sort_range(start="B5", end=(tracker_worksheet.rows, tracker_worksheet.cols), basecolumnindex=2)
     df = tracker_worksheet.get_as_df(has_header=True, start="B4", end=(tracker_worksheet.rows, 19),
@@ -163,7 +163,7 @@ def get_and_prep_tracker_df(tracker_worksheet) -> pd.DataFrame:
     return df
 
 
-def get_cleared_ids(spreadsheet, year) -> pd.DataFrame:
+def _get_cleared_ids(spreadsheet, year) -> pd.DataFrame:
     cleared_sheet = spreadsheet.worksheet_by_title(f"{year} Cleared")
     return cleared_sheet.get_as_df(has_header=True, start="C4", end=(cleared_sheet.rows, 3),
                                    include_tailing_empty=False)
@@ -171,28 +171,28 @@ def get_cleared_ids(spreadsheet, year) -> pd.DataFrame:
 
 def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: Spreadsheet, year: str) -> None:
     tech_tracker_sheet = tech_tracker_spreadsheet.worksheet_by_title(f"{year} Tracker")
-    tracker_backup_df = get_and_prep_tracker_df(tech_tracker_sheet)
+    tracker_backup_df = _get_and_prep_tracker_df(tech_tracker_sheet)
 
     hr_mot_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
-    rescinded_offer_ids = get_rescinded_offers(hr_mot_sheet)
-    hr_mot_df = get_cleaned_mot_df(hr_mot_sheet)
+    rescinded_offer_ids = _get_rescinded_offers(hr_mot_sheet)
+    hr_mot_df = _get_cleaned_mot_df(hr_mot_sheet)
 
     # Tech Tracker has ability to clear onboarders who have completed onboarding to an archive sheet
     # The below filters those onboarders out of the MOT dataset
-    cleared_ids_df = get_cleared_ids(tech_tracker_spreadsheet, year)
-    hr_mot_df = filter_out_cleared_on_boarders(cleared_ids_df, hr_mot_df)
+    cleared_ids_df = _get_cleared_ids(tech_tracker_spreadsheet, year)
+    hr_mot_df = _filter_out_cleared_on_boarders(cleared_ids_df, hr_mot_df)
 
     updated_tracker_df = pd.DataFrame()
 
     if not tracker_backup_df.empty:
-        updated_tracker_df = create_updated_df(tracker_backup_df, hr_mot_df)
-        updated_tracker_df = compare_dfs(updated_tracker_df, tracker_backup_df)
-        calculate_main_updated_date(updated_tracker_df)
+        updated_tracker_df = _create_updated_df(tracker_backup_df, hr_mot_df)
+        updated_tracker_df = _compare_dfs(updated_tracker_df, tracker_backup_df)
+        _calculate_main_updated_date(updated_tracker_df)
         logging.info('Updating Tech Tracker with data from HR\'s MOT')
     else:
         logging.info('Tech Tracker is empty')
 
-    new_records = get_new_records(tracker_backup_df, hr_mot_df)
+    new_records = _get_new_records(tracker_backup_df, hr_mot_df)
     if not new_records.empty:
         updated_tracker_df = pd.concat([updated_tracker_df, new_records])
         logging.info(f'Adding {len(new_records)} new records to tracker')
@@ -201,7 +201,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
 
     if rescinded_offer_ids:
         logging.info('Checking for rescinded offers')
-        update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
+        _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
 
     if not updated_tracker_df.empty:
         tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
@@ -211,4 +211,4 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
     else:
         logger.info('No updates found. Nothing to refresh.')
 
-    create_tracker_updated_timestamp(tech_tracker_sheet)
+    _create_tracker_updated_timestamp(tech_tracker_sheet)
