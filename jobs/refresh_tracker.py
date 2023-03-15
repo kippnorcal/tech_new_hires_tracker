@@ -172,23 +172,23 @@ def get_and_prep_tracker_df(tracker_worksheet) -> pd.DataFrame:
     return df
 
 
-def get_cleared_ids() -> pd.DataFrame:
-    cleared_sheet = create_sheet_connection(TECH_TRACKER_SHEET, f"{SCHOOL_YEAR} Cleared")
+def get_cleared_ids(spreadsheet, year) -> pd.DataFrame:
+    cleared_sheet = spreadsheet.worksheet_by_title(f"{year} Cleared")
     return cleared_sheet.get_as_df(has_header=True, start="C4", end=(cleared_sheet.rows, 3),
                                    include_tailing_empty=False)
 
 
-def main():
-    tech_tracker_sheet = create_sheet_connection(TECH_TRACKER_SHEET, f"{SCHOOL_YEAR} Tracker")
+def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: Spreadsheet, year: str) -> None:
+    tech_tracker_sheet = tech_tracker_spreadsheet.worksheet_by_title(f"{year} Tracker")
     tracker_backup_df = get_and_prep_tracker_df(tech_tracker_sheet)
 
-    hr_mot_sheet = create_sheet_connection(HR_MOT_SHEET, f"Master_{SCHOOL_YEAR}")
+    hr_mot_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
     rescinded_offer_ids = get_rescinded_offers(hr_mot_sheet)
     hr_mot_df = get_cleaned_mot_df(hr_mot_sheet)
 
     # Tech Tracker has ability to clear onboarders who have completed onboarding to an archive sheet
     # The below filters those onboarders out of the MOT dataset
-    cleared_ids_df = get_cleared_ids()
+    cleared_ids_df = get_cleared_ids(tech_tracker_spreadsheet, year)
     hr_mot_df = filter_out_cleared_on_boarders(cleared_ids_df, hr_mot_df)
 
     updated_tracker_df = pd.DataFrame()
