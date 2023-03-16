@@ -40,16 +40,17 @@ def _datefields_to_dt_obj(df):
     df['Main_LastUpdated'] = pd.to_datetime(df['Main_LastUpdated'], format="%Y-%m-%d")
 
 
-def compare_dates(df, new_col, date1, date2):
-    df[new_col] = np.where(df[date1] < df[date2], 1, 0)
+def compare_dates_new_col(df, new_col: str, date_col1: str, date_col2: str) -> None:
+    """Creates a new column with 1, 0 values by comparing two date columns"""
+    df[new_col] = np.where(df[date_col1] < df[date_col2], 1, 0)
 
 
-def eval_sla_met(df):
+def eval_sla_met(df) -> None:
     df["TechCleared_MetSLA_Boolean"] = np.where(pd.isnull(df["DateCleared"]), "n/a", 0)
     df["TechCleared_MetSLA_Boolean"] = np.where((df["TechCleared_MetSLA_Boolean"] != "n/a") & (df["DateCleared"] <= df["StartDate"]), 1, df["TechCleared_MetSLA_Boolean"])
 
 
-def eval_tech_timeliness(df):
+def eval_tech_timeliness(df) -> None:
     df["TechCleared_Timeliness"] = np.where(pd.isnull(df["DateCleared"]), "n/a", 0)
     df["TechCleared_Timeliness"] = np.where((df["TechCleared_Timeliness"] != "n/a"), (df["StartDate"] - df["DateCleared"]).dt.days, df["TechCleared_Timeliness"])
 
@@ -104,21 +105,27 @@ def refresh_sla_source(spreadsheet):
     agg_df["Hire_Month"] = agg_df['StartDate'].dt.strftime('%B')
 
     # StartDateChange_Boolean
-    compare_dates(agg_df, "StartDateChange_Boolean", "DateAdded", "StartDate_LastUpdated")
+    logger.info("Evaluating Start Date changes")
+    compare_dates_new_col(agg_df, "StartDateChange_Boolean", "DateAdded", "StartDate_LastUpdated")
 
     # LocationChange_Boolean
-    compare_dates(agg_df, "LocationChange_Boolean", "DateAdded", "PayLocation_LastUpdated")
+    logger.info("Evaluating Pay Location changes")
+    compare_dates_new_col(agg_df, "LocationChange_Boolean", "DateAdded", "PayLocation_LastUpdated")
 
     # TechCleared_MetSLA_Boolean
+    logger.info("Evaluating met SLA bool field")
     eval_sla_met(agg_df)
 
     # TechCleared_Timeliness
+    logger.info("Evaluating Tech Cleared Timeliness")
     eval_tech_timeliness(agg_df)
 
     # Include_SLA_Denominator
+    logger.info("Creating SLA denominator")
     agg_df["TODAY"] = pd.Timestamp.today().date()
-    compare_dates(agg_df, "Include_SLA_Denominator", "StartDate", "TODAY")
+    compare_dates_new_col(agg_df, "Include_SLA_Denominator", "StartDate", "TODAY")
     agg_df.drop("TODAY", axis="columns", inplace=True)
 
     # push to Google Sheets
+    logger.info("Inserting into SLA_data_source")
     sla_sheet.set_dataframe(agg_df, "A1")
