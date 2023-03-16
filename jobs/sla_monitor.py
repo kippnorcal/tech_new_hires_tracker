@@ -27,11 +27,11 @@ COLUMN_RENAME_MAP = {
     "Cleared Email Sent": "ClearedEmailSent",
     "Work Location": "WorkLocation",
     "Personal Email": "Personal_Email",
-    "Completion Status" "Completion_Status"
+    "Completion Status": "Completion_Status"
 }
 
 
-def _datefields_to_dt_obj(df):
+def _datefields_to_dt_obj(df) -> None:
     df['StartDate_LastUpdated'] = pd.to_datetime(df['StartDate_LastUpdated'], format="%Y-%m-%d")
     df['PayLocation_LastUpdated'] = pd.to_datetime(df['PayLocation_LastUpdated'], format="%Y-%m-%d")
     df['DateCleared'] = pd.to_datetime(df['DateCleared'], format="%m/%d/%Y")
@@ -61,20 +61,31 @@ def identify_tracker_cleared_sheets(spreadsheet) -> Tuple[List[pd.DataFrame], Li
     tracker = []
 
     for sheet in sheet_list:
+        logger.info(f"Evaluating {sheet.title}")
         sheet_type = sheet.title.split(' ')[-1]
-        sheet_year = sheet.title.split(' ')[0]
-        sheet_df = sheet.get_as_df(has_header=True, start="B4", end=(sheet.rows, sheet.cols),
-                                   include_tailing_empty=False)
+        if sheet_type in ["Cleared", "Tracker"]:
+            logger.info(f"-- Sheet type is {sheet_type}")
+            sheet_year = sheet.title.split(' ')[0]
+            logger.info(f"-- Sheet year is {sheet_year}")
+            sheet_df = sheet.get_as_df(has_header=True, start="B4", end=(sheet.rows, sheet.cols),
+                                       include_tailing_empty=False)
 
-        sheet_df["SchoolYear"] = f"20{sheet_year.split('-')[-1]}"
-        if sheet_type == "Cleared":
-            cleared.append(sheet_df)
-        elif sheet_type == "Tracker":
-            tracker.append(sheet_df)
+            sheet_df["SchoolYear"] = f"20{sheet_year.split('-')[-1]}"
+            if sheet_type == "Cleared":
+                logger.info(f"-- Added to cleared list")
+                cleared.append(sheet_df)
+            elif sheet_type == "Tracker":
+                logger.info(f"-- Added to tracker list")
+                tracker.append(sheet_df)
+        else:
+            logger.info("Not a Tracker or a Cleared sheet")
 
+    logger.info(f"Evaluated {len(cleared)} cleared and {len(tracker)} tracker "
+                f"sheets")
     return cleared, tracker
 
-def refresh_sla_source(spreadsheet):
+
+def refresh_sla_source(spreadsheet) -> None:
     sla_sheet = spreadsheet.worksheet_by_title("SLA_data_source")
     cleared_dfs, tracker_dfs = identify_tracker_cleared_sheets(spreadsheet)
 
