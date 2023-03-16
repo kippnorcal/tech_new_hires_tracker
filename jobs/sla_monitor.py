@@ -1,7 +1,11 @@
+import logging
 from typing import List, Tuple
+
 import numpy as np
 import pandas as pd
 from pygsheets import Worksheet
+
+logger = logging.getLogger(__name__)
 
 COLUMN_RENAME_MAP = {
     "New, Returners, Rehire or Transfer": "NewHire_Type",
@@ -77,13 +81,19 @@ def refresh_sla_source(spreadsheet):
     tracker_df['Date Cleared'] = None
     cleared_dfs.append(tracker_df)
     agg_df = pd.concat(cleared_dfs)
+    logger.info("**Combined sheets into one data frame**")
+
     # filter out rescinded candidates
     agg_df = agg_df.drop(agg_df[agg_df.Rescinded != '--'].index)
+    logger.info("Removed rescinded hires")
+
     # drop rescinded col
     agg_df.drop("Rescinded", axis="columns", inplace=True)
+    logger.info("Dropped rescinded column")
 
     # Rename Columns
     agg_df.rename(columns=COLUMN_RENAME_MAP, inplace=True)
+    logger.info("Renamed columns")
 
     # COMBINE FIRST AND LAST NAMES
     agg_df['Staff_Name'] = agg_df["First Name"].astype(str) + ' ' + agg_df["Last Name"].astype(str)
