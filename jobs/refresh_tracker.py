@@ -63,6 +63,7 @@ def _get_cleaned_mot_df(hr_mot_worksheet) -> pd.DataFrame:
     mot_df.drop(index=empty_string_indexes.index, inplace=True)
 
     mot_df.astype(str)
+    mot_df['Cleared Email Sent'] = np.where(mot_df['Cleared Email Sent'] == 'TRUE', 'Yes', 'No')
     return mot_df
 
 
