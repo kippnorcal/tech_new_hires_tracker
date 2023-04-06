@@ -138,6 +138,10 @@ def refresh_sla_source(spreadsheet) -> None:
     compare_dates_new_col(agg_df, "Include_SLA_Denominator", "StartDate", "TODAY")
     agg_df.drop("TODAY", axis="columns", inplace=True)
 
+    # Converting NaT values in DateCleared field to blank strings
+    agg_df["DateCleared"] = agg_df["DateCleared"].dt.strftime('%Y-%m-%d')
+    agg_df["DateCleared"] = agg_df["DateCleared"].replace(pd.NaT, '')
+
     # push to Google Sheets
     logger.info("Inserting into SLA_data_source")
     sla_sheet.set_dataframe(agg_df, "A1")
