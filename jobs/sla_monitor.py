@@ -52,6 +52,11 @@ def eval_sla_met(df) -> None:
                                                 np.where((df["DateCleared"] + timedelta(days=3)) <= df["StartDate"], 1, 0))
 
 
+def create_sla_denominator_field(df):
+    df["Include_SLA_Denominator"] = np.where(pd.isnull(df["DateCleared"]),
+                                             np.where((date.today() + timedelta(days=1)) > df["StartDate"].dt.date, 1, 0), 1)
+
+
 def eval_tech_timeliness(df) -> None:
     df["TechCleared_Timeliness"] = np.where(pd.isnull(df["DateCleared"]), "", (df["DateCleared"] - df["StartDate"]).dt.days)
 
@@ -134,9 +139,7 @@ def refresh_sla_source(spreadsheet) -> None:
 
     # Include_SLA_Denominator
     logger.info("Creating SLA denominator")
-    agg_df["TODAY"] = pd.Timestamp.today().date()
-    compare_dates_new_col(agg_df, "Include_SLA_Denominator", "StartDate", "TODAY")
-    agg_df.drop("TODAY", axis="columns", inplace=True)
+    create_sla_denominator_field(agg_df)
 
     # Converting NaT values in DateCleared field to blank strings
     agg_df["DateCleared"] = agg_df["DateCleared"].dt.strftime('%Y-%m-%d')
