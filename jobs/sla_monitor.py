@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 import logging
 from typing import List, Tuple
 
@@ -46,13 +47,18 @@ def compare_dates_new_col(df, new_col: str, date_col1: str, date_col2: str) -> N
 
 
 def eval_sla_met(df) -> None:
-    df["TechCleared_MetSLA_Boolean"] = np.where(pd.isnull(df["DateCleared"]), "n/a", 0)
-    df["TechCleared_MetSLA_Boolean"] = np.where((df["TechCleared_MetSLA_Boolean"] != "n/a") & (df["DateCleared"] <= df["StartDate"]), 1, df["TechCleared_MetSLA_Boolean"])
+    df["TechCleared_MetSLA_Boolean"] = np.where(pd.isnull(df["DateCleared"]),
+                                                np.where(date.today() >= df["StartDate"].dt.date, 0, 1),
+                                                np.where((df["DateCleared"] + timedelta(days=1)) <= df["StartDate"], 1, 0))
+
+
+def create_sla_denominator_field(df):
+    df["Include_SLA_Denominator"] = np.where(pd.isnull(df["DateCleared"]),
+                                             np.where((date.today() + timedelta(days=1)) > df["StartDate"].dt.date, 1, 0), 1)
 
 
 def eval_tech_timeliness(df) -> None:
-    df["TechCleared_Timeliness"] = np.where(pd.isnull(df["DateCleared"]), "n/a", 0)
-    df["TechCleared_Timeliness"] = np.where((df["TechCleared_Timeliness"] != "n/a"), (df["StartDate"] - df["DateCleared"]).dt.days, df["TechCleared_Timeliness"])
+    df["TechCleared_Timeliness"] = np.where(pd.isnull(df["DateCleared"]), "", (df["DateCleared"] - df["StartDate"]).dt.days)
 
 
 def identify_tracker_cleared_sheets(spreadsheet) -> Tuple[List[pd.DataFrame], List[pd.DataFrame]]:
@@ -133,9 +139,11 @@ def refresh_sla_source(spreadsheet) -> None:
 
     # Include_SLA_Denominator
     logger.info("Creating SLA denominator")
-    agg_df["TODAY"] = pd.Timestamp.today().date()
-    compare_dates_new_col(agg_df, "Include_SLA_Denominator", "StartDate", "TODAY")
-    agg_df.drop("TODAY", axis="columns", inplace=True)
+    create_sla_denominator_field(agg_df)
+
+    # Converting NaT values in DateCleared field to blank strings
+    agg_df["DateCleared"] = agg_df["DateCleared"].dt.strftime('%Y-%m-%d')
+    agg_df["DateCleared"] = agg_df["DateCleared"].replace(pd.NaT, '')
 
     # push to Google Sheets
     logger.info("Inserting into SLA_data_source")
