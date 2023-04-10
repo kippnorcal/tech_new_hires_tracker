@@ -61,7 +61,7 @@ def _eval_sla_met(df) -> None:
     df["TechCleared_MetSLA_Boolean"] = df["TechCleared_MetSLA_Boolean"].replace(np.nan, '')
 
 
-def _create_sla_denominator_field(df) -> None:
+def _eval_sla_denominator_field(df) -> None:
     """Evaluating if record should be included in SLA denominator
     If DateCleared is not null, then set value to 1
     If DateCleared is null, then evaluate if SLA deadline has passed, If True, set value to 1"""
@@ -160,7 +160,7 @@ def refresh_sla_source(spreadsheet) -> None:
 
     # Include_SLA_Denominator
     logger.info("Creating SLA denominator")
-    _create_sla_denominator_field(agg_df)
+    _eval_sla_denominator_field(agg_df)
 
     # Converting NaT values in DateCleared field to blank strings
     agg_df["DateCleared"] = agg_df["DateCleared"].dt.strftime('%Y-%m-%d')
