@@ -168,4 +168,5 @@ def refresh_sla_source(spreadsheet) -> None:
 
     # push to Google Sheets
     logger.info("Inserting into SLA_data_source")
+    sla_sheet.clear()
     sla_sheet.set_dataframe(agg_df, "A1")
