@@ -48,7 +48,7 @@ def compare_dates_new_col(df, new_col: str, date_col1: str, date_col2: str) -> N
 
 def eval_sla_met(df) -> None:
     df["TechCleared_MetSLA_Boolean"] = np.where(pd.isnull(df["DateCleared"]),
-                                                None,
+                                                np.where((date.today() + timedelta(days=1)) > df["StartDate"].dt.date, 0, None),
                                                 np.where((df["DateCleared"] + timedelta(days=1)) <= df["StartDate"], 1, 0))
     df["TechCleared_MetSLA_Boolean"] = df["TechCleared_MetSLA_Boolean"].replace(np.nan, '')
 
