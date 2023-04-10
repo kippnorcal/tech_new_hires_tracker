@@ -47,8 +47,11 @@ def _compare_dates_new_col(df, new_col: str, date_col1: str, date_col2: str) -> 
 
 
 def _eval_sla_met(df) -> None:
-    """If DateCleared is null, then check if today + 1 is passed StartDate - if true, then 0
-    If DateCleared is NOT null, then check if DateCleared + 1 is earlier than StartDate"""
+    """Evaluating if the Service Level Agreement has been met for each record.
+    If SLA has been met, set value at 1
+    If SLA has not been met, set value to 0
+    If on-boarder has not yet started, set value to None, then replace with empty string"""
+
     df["TechCleared_MetSLA_Boolean"] = np.where(
         pd.isnull(df["DateCleared"]),
         np.where((date.today() + timedelta(days=1)) > df["StartDate"].dt.date, 0, None),
@@ -58,13 +61,25 @@ def _eval_sla_met(df) -> None:
     df["TechCleared_MetSLA_Boolean"] = df["TechCleared_MetSLA_Boolean"].replace(np.nan, '')
 
 
-def _create_sla_denominator_field(df):
-    df["Include_SLA_Denominator"] = np.where(pd.isnull(df["DateCleared"]),
-                                             np.where((date.today() + timedelta(days=1)) > df["StartDate"].dt.date, 1, 0), 1)
+def _create_sla_denominator_field(df) -> None:
+    """Evaluating if record should be included in SLA denominator
+    If DateCleared is not null, then set value to 1
+    If DateCleared is null, then evaluate if SLA deadline has passed, If True, set value to 1"""
+
+    df["Include_SLA_Denominator"] = np.where(
+        pd.isnull(df["DateCleared"]),
+        np.where((date.today() + timedelta(days=1)) > df["StartDate"].dt.date, 1, 0),
+        1
+    )
 
 
 def _eval_tech_timeliness(df) -> None:
-    df["TechCleared_Timeliness"] = np.where(pd.isnull(df["DateCleared"]), "", (df["DateCleared"] - df["StartDate"]).dt.days)
+    """If DateCleared, then calculate how on-time tech was provisioned"""
+    df["TechCleared_Timeliness"] = np.where(
+        pd.isnull(df["DateCleared"]),
+        "",
+        (df["DateCleared"] - df["StartDate"]).dt.days
+    )
 
 
 def _identify_tracker_cleared_sheets(spreadsheet) -> Tuple[List[pd.DataFrame], List[pd.DataFrame]]:
