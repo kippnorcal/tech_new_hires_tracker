@@ -4,13 +4,16 @@ from email.mime.text import MIMEText
 
 
 class Mailer:
-    def __init__(self, job_name):
+    def __init__(self, job_name=None):
         self._job_name = job_name
         self.user = getenv("GMAIL_USER")
         self.password = getenv("GMAIL_PWD")
         self.server = SMTP_SSL("smtp.gmail.com", 465)
         self.from_address = "KIPP NorCal Job Notification"
         self.to_address = getenv("NOTIF_TO_ADDRESS")
+
+    def job_name_extend(self, name):
+        self._job_name = f"{self._job_name} - {name}"
 
     def _subject_line(self):
         subject_type = "Success" if self.success else "Error"
