@@ -18,7 +18,7 @@ COLUMN_MAPPINGS = {
     3: 'job_candidate_id',
     4: 'First Name',
     5: 'Last Name',
-    1: 'New, Returners, Rehire or Transfer',
+    20: 'Hire Reason',
     19: 'Personal Email',
     7: 'Work Location',
     8: 'Pay Location',
@@ -26,8 +26,8 @@ COLUMN_MAPPINGS = {
     13: 'Title',
     16: 'Former or Current KIPP',
     15: 'SpEd',
-    50: 'Cleared?',
-    51: 'Cleared Email Sent'
+    51: 'Cleared?',
+    52: 'Cleared Email Sent'
 }
 
 
