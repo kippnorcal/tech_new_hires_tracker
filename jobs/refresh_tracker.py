@@ -18,7 +18,7 @@ COLUMN_MAPPINGS = {
     3: 'job_candidate_id',
     4: 'First Name',
     5: 'Last Name',
-    20: 'Hire Reason',
+    1: 'New, Returners, Rehire or Transfer',  # Update to index 20 after summer on-boarders have been cleared
     19: 'Personal Email',
     7: 'Work Location',
     8: 'Pay Location',
