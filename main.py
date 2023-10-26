@@ -25,24 +25,21 @@ def create_sheet_connection(sheet_key: str) -> Spreadsheet:
     return client.open_by_key(sheet_key)
 
 
-def main():
+def main(notifications):
     tech_spreadsheet = create_sheet_connection(TECH_TRACKER_SHEET)
     if ARGS.sla_monitor_refresh:
+        notifications.extend_job_name("- SLA Monitor Refresh")
         refresh_sla_source(tech_spreadsheet)
     else:
         school_year = ARGS.school_year[0]
-        hr_mot_spreadsheet = create_sheet_connection(HR_MOT_SHEET)
-        tracker_refresh(tech_spreadsheet, hr_mot_spreadsheet, school_year)
+        notifications.extend_job_name(f"- {ARGS.school_year[0]}")
+        tracker_refresh(tech_spreadsheet, school_year)
 
 
 if __name__ == "__main__":
-    if ARGS.sla_monitor_refresh:
-        notifications = create_notifications("Tech On-boarding Tracker - SLA Monitor Refresh",
-                                             "mailgun", logs="app.log")
-    else:
-        notifications = create_notifications(f"Tech On-boarding Tracker - {ARGS.school_year[0]}",
-                                             "mailgun", logs="app.log")
+    notifications = create_notifications("Tech On-boarding Tracker", "mailgun", logs="app.log")
     try:
+        main(notifications)
         notifications.notify()
     except Exception as e:
         stack_trace = traceback.format_exc()
