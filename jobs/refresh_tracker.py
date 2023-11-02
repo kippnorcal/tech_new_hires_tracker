@@ -35,6 +35,10 @@ COLUMN_MAPPINGS = {
 def _get_jobvite_data(sql: MSSQL) -> pd.DataFrame:
     df = sql.query_from_file('sql/recent_new_hires.sql')
     df["Start Date"] = pd.to_datetime(df["Start Date"]).dt.strftime("%Y-%m-%d")
+    # Adding three blank columns that come from HR's MOT; These need to be deprecated
+    df["SpEd"] = ""
+    df["Cleared?"] = ""
+    df["Cleared Email Sent?"] = ""
     return df
 
 
