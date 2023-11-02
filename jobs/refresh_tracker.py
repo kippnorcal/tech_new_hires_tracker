@@ -108,16 +108,9 @@ def _filter_out_cleared_on_boarders(cleared_ids_df, tech_tracker_df) -> pd.DataF
     return result
 
 
-def _get_rescinded_offers(hr_mot_worksheet) -> list:
-    """HR strikesthrough rescinded offers; this func evaluates for this"""
-    rescinded_offer_ids = list()
-    col = hr_mot_worksheet.get_col(4, include_tailing_empty=False, returnas='cell')
-    for cell in col[2:]:
-        if cell is not None:
-            if cell.text_format is not None:
-                if cell.text_format.get('strikethrough', False):
-                    rescinded_offer_ids.append(cell.value_unformatted)
-    return rescinded_offer_ids
+def _get_rescinded_offers(sql: MSSQL) -> list:
+    df = sql.query_from_file('sql/rescinded_offers.sql')
+    return df["job_candidate_id"].to_list()
 
 
 def _update_rescinded_col(id_list, df) -> pd.DataFrame:
