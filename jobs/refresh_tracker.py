@@ -32,6 +32,12 @@ COLUMN_MAPPINGS = {
 }
 
 
+def _get_jobvite_data(sql: MSSQL) -> pd.DataFrame:
+    df = sql.query_from_file('sql/recent_new_hires.sql')
+    df["Start Date"] = pd.to_datetime(df["Start Date"]).dt.strftime("%Y-%m-%d")
+    return df
+
+
 def _create_tracker_updated_timestamp(tracker_worksheet) -> None:
     timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
     d_stamp = timestamp.strftime('%x')
@@ -176,9 +182,9 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, year: str) -> None:
     tech_tracker_sheet = tech_tracker_spreadsheet.worksheet_by_title(f"{year} Tracker")
     tracker_backup_df = _get_and_prep_tracker_df(tech_tracker_sheet)
 
-    hr_mot_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
-    rescinded_offer_ids = _get_rescinded_offers(hr_mot_sheet)
-    hr_mot_df = _get_cleaned_mot_df(hr_mot_sheet)
+    jobvite_df = _get_jobvite_data(sql)
+
+    rescinded_offer_ids = _get_rescinded_offers(sql)
 
     # Tech Tracker has ability to clear onboarders who have completed onboarding to an archive sheet
     # The below filters those onboarders out of the MOT dataset
