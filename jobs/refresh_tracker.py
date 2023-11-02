@@ -33,7 +33,7 @@ COLUMN_MAPPINGS = {
 
 
 def _get_jobvite_data(sql: MSSQL) -> pd.DataFrame:
-    df = sql.query_from_file('~/sql/recent_new_hires.sql')
+    df = sql.query_from_file('sql/recent_new_hires.sql')
     df["Start Date"] = pd.to_datetime(df["Start Date"]).dt.strftime("%Y-%m-%d")
     # Adding three blank columns that come from HR's MOT; These need to be deprecated
     df["SpEd"] = ""
@@ -113,7 +113,7 @@ def _filter_out_cleared_on_boarders(cleared_ids_df, tech_tracker_df) -> pd.DataF
 
 
 def _get_rescinded_offers(sql: MSSQL) -> list:
-    df = sql.query_from_file('~/sql/rescinded_offers.sql')
+    df = sql.query_from_file('sql/rescinded_offers.sql')
     return df["job_candidate_id"].to_list()
 
 
