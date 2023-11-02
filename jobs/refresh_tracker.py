@@ -182,19 +182,19 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, year: str) -> None:
     # Tech Tracker has ability to clear onboarders who have completed onboarding to an archive sheet
     # The below filters those onboarders out of the MOT dataset
     cleared_ids_df = _get_cleared_ids(tech_tracker_spreadsheet, year)
-    hr_mot_df = _filter_out_cleared_on_boarders(cleared_ids_df, hr_mot_df)
+    jobvite_df = _filter_out_cleared_on_boarders(cleared_ids_df, jobvite_df)
 
     updated_tracker_df = pd.DataFrame()
 
     if not tracker_backup_df.empty:
-        updated_tracker_df = _create_updated_df(tracker_backup_df, hr_mot_df)
+        updated_tracker_df = _create_updated_df(tracker_backup_df, jobvite_df)
         updated_tracker_df = _compare_dfs(updated_tracker_df, tracker_backup_df)
         _calculate_main_updated_date(updated_tracker_df)
         logging.info('Updating Tech Tracker with data from HR\'s MOT')
     else:
         logging.info('Tech Tracker is empty')
 
-    new_records = _get_new_records(tracker_backup_df, hr_mot_df)
+    new_records = _get_new_records(tracker_backup_df, jobvite_df)
     if not new_records.empty:
         updated_tracker_df = pd.concat([updated_tracker_df, new_records])
         logging.info(f'Adding {len(new_records)} new records to tracker')
