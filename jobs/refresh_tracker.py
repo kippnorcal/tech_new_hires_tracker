@@ -59,25 +59,6 @@ def _create_updated_df(tech_tracker_df, mot_df) -> pd.DataFrame:
     return df
 
 
-def _get_cleaned_mot_df(hr_mot_worksheet) -> pd.DataFrame:
-    mot_df = hr_mot_worksheet.get_as_df(start=(3, 1), end=(hr_mot_worksheet.rows, hr_mot_worksheet.cols),
-                                        has_header=False, include_tailing_empty=False)
-    mot_df = mot_df.rename(columns=COLUMN_MAPPINGS)
-
-    #  Filtering unneeded columns
-    column_filter = list(COLUMN_MAPPINGS.values())
-    mot_df[column_filter].copy()
-    mot_df = mot_df[column_filter].copy()
-
-    #  Removing indexes where the job_candidate_id is blank
-    empty_string_indexes = mot_df[mot_df['job_candidate_id'] == '']
-    mot_df.drop(index=empty_string_indexes.index, inplace=True)
-
-    mot_df.astype(str)
-    mot_df['Cleared Email Sent'] = np.where(mot_df['Cleared Email Sent'] == 'TRUE', 'Yes', 'No')
-    return mot_df
-
-
 def _fill_in_date_fields(df) -> None:
     today = date.today()
     df['Date Added'] = today
