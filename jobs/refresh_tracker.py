@@ -35,11 +35,28 @@ COLUMN_MAPPINGS = {
 def _get_jobvite_data(sql: MSSQL) -> pd.DataFrame:
     df = sql.query_from_file('sql/recent_new_hires.sql')
     df["Start Date"] = pd.to_datetime(df["Start Date"]).dt.strftime("%Y-%m-%d")
-    # Adding three blank columns that come from HR's MOT; These need to be deprecated
-    df["SpEd"] = ""
-    df["Cleared?"] = ""
-    df["Cleared Email Sent?"] = ""
     return df
+
+
+def _generate_sped_column(df):
+    df['SpEd'] = df.apply(_determine_if_sped, axis=1)
+    return df
+
+
+def _determine_if_sped(row):
+    key_substrings = [
+        "Special Education",
+        "Paraeducator",
+        "Mental Health",
+        "Occupational Therapist",
+        "Behavioral",
+        "Psychologist",
+        "Pathologist"
+    ]
+    for substring in key_substrings:
+        if substring in row["Title"]:
+            return "Yes"
+    return "No"
 
 
 def _create_tracker_updated_timestamp(tracker_worksheet) -> None:
@@ -49,7 +66,7 @@ def _create_tracker_updated_timestamp(tracker_worksheet) -> None:
     tracker_worksheet.update_value('A2', f'LAST UPDATED: {d_stamp} @ {t_stamp}')
 
 
-def _create_updated_df(tech_tracker_df, mot_df) -> pd.DataFrame:
+def _create_updated_df(tech_tracker_df: pd.DataFrame, mot_df: pd.DataFrame) -> pd.DataFrame:
     df = tech_tracker_df.copy()
     df.set_index('job_candidate_id', inplace=True)
     mot_df.set_index('job_candidate_id', inplace=True)
@@ -91,6 +108,19 @@ def _filter_out_cleared_on_boarders(cleared_ids_df, tech_tracker_df) -> pd.DataF
         on=["job_candidate_id"]).query('_merge=="left_only"')
     result.drop(["_merge"], axis=1, inplace=True)
     return result
+
+
+def _filter_candidates_for_school_year(jobvite_df, school_year):
+    jobvite_df["Start Date"] = pd.to_datetime(jobvite_df["Start Date"])
+    year_2digit = school_year[-2:]
+    year = int(f"20{year_2digit}")  # convert school year to 4 digit year
+    start_of_year = datetime(year - 1, 6, 30)
+    end_of_year = datetime(year, 7, 1)
+    jobvite_df = jobvite_df[
+        (jobvite_df["Start Date"] >= start_of_year) & (jobvite_df["Start Date"] < end_of_year)
+        ]
+    jobvite_df["Start Date"] = jobvite_df["Start Date"].dt.strftime('%m/%d/%Y')
+    return jobvite_df
 
 
 def _get_rescinded_offers(sql: MSSQL) -> list:
@@ -161,11 +191,13 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, year: str) -> None:
     tracker_backup_df = _get_and_prep_tracker_df(tech_tracker_sheet)
 
     jobvite_df = _get_jobvite_data(sql)
+    jobvite_df = _generate_sped_column(jobvite_df)
+    jobvite_df = _filter_candidates_for_school_year(jobvite_df, year)
 
     rescinded_offer_ids = _get_rescinded_offers(sql)
 
     # Tech Tracker has ability to clear onboarders who have completed onboarding to an archive sheet
-    # The below filters those onboarders out of the MOT dataset
+    # The below filters those onboarders out of the Jobvite dataset
     cleared_ids_df = _get_cleared_ids(tech_tracker_spreadsheet, year)
     jobvite_df = _filter_out_cleared_on_boarders(cleared_ids_df, jobvite_df)
 
@@ -181,6 +213,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, year: str) -> None:
 
     new_records = _get_new_records(tracker_backup_df, jobvite_df)
     if not new_records.empty:
+        new_records = _generate_sped_column(new_records)
         updated_tracker_df = pd.concat([updated_tracker_df, new_records])
         logging.info(f'Adding {len(new_records)} new records to tracker')
     else:
