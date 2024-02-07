@@ -201,7 +201,7 @@ def _get_cleared_ids(spreadsheet, year) -> pd.DataFrame:
                                    include_tailing_empty=False)
 
 
-def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, year: str) -> None:
+def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: Spreadsheet, year: str) -> None:
     sql = MSSQL()
     tech_tracker_sheet = tech_tracker_spreadsheet.worksheet_by_title(f"{year} Tracker")
     tracker_backup_df = _get_and_prep_tracker_df(tech_tracker_sheet)

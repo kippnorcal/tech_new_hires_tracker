@@ -27,13 +27,14 @@ def create_sheet_connection(sheet_key: str) -> Spreadsheet:
 
 def main(notifications):
     tech_spreadsheet = create_sheet_connection(TECH_TRACKER_SHEET)
+    hr_mot_spreadsheet = create_sheet_connection(HR_MOT_SHEET)
     if ARGS.sla_monitor_refresh:
         notifications.extend_job_name("- SLA Monitor Refresh")
         refresh_sla_source(tech_spreadsheet)
     else:
         school_year = ARGS.school_year[0]
         notifications.extend_job_name(f"- {ARGS.school_year[0]}")
-        tracker_refresh(tech_spreadsheet, school_year)
+        tracker_refresh(tech_spreadsheet, hr_mot_spreadsheet, school_year)
 
 
 if __name__ == "__main__":
