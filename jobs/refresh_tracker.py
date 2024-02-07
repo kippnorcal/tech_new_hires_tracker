@@ -17,19 +17,35 @@ logger = logging.getLogger(__name__)
 # The order of the columns below determines the order in the Tech Tracker
 COLUMN_MAPPINGS = {
     3: 'job_candidate_id',
-    4: 'First Name',
-    5: 'Last Name',
-    20: 'Hire Reason',
-    19: 'Personal Email',
-    7: 'Work Location',
-    8: 'Pay Location',
-    9: 'Start Date',
-    13: 'Title',
-    16: 'Former or Current KIPP',
-    15: 'SpEd',
     51: 'Cleared?',
     52: 'Cleared Email Sent'
 }
+
+
+def _get_cleared_mot_data(hr_mot_worksheet) -> pd.DataFrame:
+    mot_df = hr_mot_worksheet.get_as_df(start=(3, 1), end=(hr_mot_worksheet.rows, hr_mot_worksheet.cols),
+                                        has_header=False, include_tailing_empty=False)
+    mot_df = mot_df.rename(columns=COLUMN_MAPPINGS)
+
+    #  Filtering unneeded columns
+    column_filter = list(COLUMN_MAPPINGS.values())
+    mot_df[column_filter].copy()
+    mot_df = mot_df[column_filter].copy()
+
+    #  Removing indexes where the job_candidate_id is blank
+    empty_string_indexes = mot_df[mot_df['job_candidate_id'] == '']
+    mot_df.drop(index=empty_string_indexes.index, inplace=True)
+
+    mot_df.astype(str)
+    mot_df['Cleared Email Sent'] = np.where(mot_df['Cleared Email Sent'] == 'TRUE', 'Yes', 'No')
+    return mot_df
+
+
+def _add_cleared_column_info(tracker_df) -> pd.DataFrame:
+    """Adds cleared columns to new records"""
+    tracker_df['Cleared?'] = ""
+    tracker_df['Cleared Email Sent'] = ""
+    return tracker_df
 
 
 def _get_jobvite_data(sql: MSSQL) -> pd.DataFrame:
@@ -214,6 +230,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, year: str) -> None:
     new_records = _get_new_records(tracker_backup_df, jobvite_df)
     if not new_records.empty:
         new_records = _generate_sped_column(new_records)
+        new_records = _add_cleared_column_info(new_records)
         updated_tracker_df = pd.concat([updated_tracker_df, new_records])
         logging.info(f'Adding {len(new_records)} new records to tracker')
     else:
