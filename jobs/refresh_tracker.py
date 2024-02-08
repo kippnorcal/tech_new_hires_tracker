@@ -82,13 +82,13 @@ def _create_tracker_updated_timestamp(tracker_worksheet) -> None:
     tracker_worksheet.update_value('A2', f'LAST UPDATED: {d_stamp} @ {t_stamp}')
 
 
-def _create_updated_df(tech_tracker_df: pd.DataFrame, mot_df: pd.DataFrame) -> pd.DataFrame:
-    df = tech_tracker_df.copy()
+def _update_dataframe(stale_df: pd.DataFrame, current_data_df: pd.DataFrame) -> pd.DataFrame:
+    """Generalized func to update one ata frame with data from another"""
+    df = stale_df.copy()
     df.set_index('job_candidate_id', inplace=True)
-    mot_df.set_index('job_candidate_id', inplace=True)
-    df.update(mot_df)
+    current_data_df.set_index('job_candidate_id', inplace=True)
+    df.update(current_data_df)
     df.reset_index(inplace=True)
-    df.drop(columns=['Start Date - Last Updated', 'Pay Location - Last Updated', 'Main Last Updated'])
     return df
 
 
@@ -159,7 +159,14 @@ def _compare_dfs(updated_tracker_df, old_tracker_df) -> pd.DataFrame:
     cols_to_compare = ['Start Date', 'Pay Location']
     for col in cols_to_compare:
         df_compared = _merge_for_comparison(updated_tracker_df, old_tracker_df, col)
-        updated_tracker_df = _create_updated_df(updated_tracker_df, df_compared)
+        updated_tracker_df = _update_dataframe(updated_tracker_df, df_compared)
+        updated_tracker_df.drop(
+            columns=[
+                'Start Date - Last Updated',
+                'Pay Location - Last Updated',
+                'Main Last Updated'
+            ]
+        )
     return updated_tracker_df
 
 
@@ -220,7 +227,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
     updated_tracker_df = pd.DataFrame()
 
     if not tracker_backup_df.empty:
-        updated_tracker_df = _create_updated_df(tracker_backup_df, jobvite_df)
+        updated_tracker_df = _update_dataframe(tracker_backup_df, jobvite_df)
         updated_tracker_df = _compare_dfs(updated_tracker_df, tracker_backup_df)
         _calculate_main_updated_date(updated_tracker_df)
         logging.info('Updating Tech Tracker with data from HR\'s MOT')
@@ -243,6 +250,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
     if not updated_tracker_df.empty:
         hr_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
         hr_cleared_df = _get_cleared_mot_data(hr_sheet)
+        updated_tracker_df = _update_dataframe(updated_tracker_df, hr_cleared_df)
         tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
         sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
         tech_tracker_sheet.sort_range('B5', sheet_dim, basecolumnindex=18, sortorder='DESCENDING')
