@@ -92,8 +92,9 @@ def _update_dataframe(stale_df: pd.DataFrame, current_data_df: pd.DataFrame) -> 
     return df
 
 
-def _fill_in_date_fields(df) -> None:
+def _fill_in_rescinded_and_date_fields(df) -> None:
     today = date.today()
+    df['Rescinded'] = '--'
     df['Date Added'] = today
     df['Start Date - Last Updated'] = today
     df['Pay Location - Last Updated'] = today
@@ -109,9 +110,6 @@ def _get_new_records(tracker_df, mot_df) -> pd.DataFrame:
         how="outer",
         on=["job_candidate_id"]).query('_merge=="left_only"')
     result.drop(["_merge"], axis=1, inplace=True)
-    if not result.empty:
-        result['Rescinded'] = '--'
-        _fill_in_date_fields(result)
     return result
 
 
@@ -238,6 +236,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
     if not new_records.empty:
         new_records = _generate_sped_column(new_records)
         new_records = _add_cleared_column_info(new_records)
+        _fill_in_rescinded_and_date_fields(new_records)
         updated_tracker_df = pd.concat([updated_tracker_df, new_records])
         logging.info(f'Adding {len(new_records)} new records to tracker')
     else:
