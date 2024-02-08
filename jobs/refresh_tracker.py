@@ -241,6 +241,8 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
         _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
 
     if not updated_tracker_df.empty:
+        hr_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
+        hr_cleared_df = _get_cleared_mot_data(hr_sheet)
         tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
         sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
         tech_tracker_sheet.sort_range('B5', sheet_dim, basecolumnindex=18, sortorder='DESCENDING')
