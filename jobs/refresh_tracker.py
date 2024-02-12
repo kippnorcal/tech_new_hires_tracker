@@ -83,7 +83,7 @@ def _create_tracker_updated_timestamp(tracker_worksheet) -> None:
 
 
 def _update_dataframe(stale_df: pd.DataFrame, current_data_df: pd.DataFrame) -> pd.DataFrame:
-    """Generalized func to update one ata frame with data from another"""
+    """Generalized func to update one dataframe with data from another"""
     try:
         df = stale_df.copy()
         df.set_index("job_candidate_id", inplace=True)
@@ -158,7 +158,8 @@ def _update_rescinded_col(id_list, df) -> pd.DataFrame:
     return df
 
 
-def _compare_dfs(updated_tracker_df, old_tracker_df) -> pd.DataFrame:
+def _compare_date_tracked_columns(updated_tracker_df, old_tracker_df) -> pd.DataFrame:
+    """Function that will date stamp changes to data in columns"""
     cols_to_compare = ["Start Date", "Pay Location"]
     for col in cols_to_compare:
         df_compared = _merge_for_comparison(updated_tracker_df, old_tracker_df, col)
@@ -231,7 +232,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
 
     if not tracker_backup_df.empty:
         updated_tracker_df = _update_dataframe(tracker_backup_df, jobvite_df)
-        updated_tracker_df = _compare_dfs(updated_tracker_df, tracker_backup_df)
+        updated_tracker_df = _compare_date_tracked_columns(updated_tracker_df, tracker_backup_df)
         _calculate_main_updated_date(updated_tracker_df)
         logging.info("Updating Tech Tracker with data from HR's MOT")
     else:
