@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 from pygsheets import Spreadsheet, Worksheet
+from sqlsorcery import MSSQL
 
 TECH_TRACKER_SHEET = os.getenv("TECH_TRACKER_SHEETS_ID")
 HR_MOT_SHEET = os.getenv("HR_MOT_SHEETS_ID")
@@ -16,39 +17,12 @@ logger = logging.getLogger(__name__)
 # The order of the columns below determines the order in the Tech Tracker
 COLUMN_MAPPINGS = {
     3: 'job_candidate_id',
-    4: 'First Name',
-    5: 'Last Name',
-    20: 'Hire Reason',
-    19: 'Personal Email',
-    7: 'Work Location',
-    8: 'Pay Location',
-    9: 'Start Date',
-    13: 'Title',
-    16: 'Former or Current KIPP',
-    15: 'SpEd',
     51: 'Cleared?',
     52: 'Cleared Email Sent'
 }
 
 
-def _create_tracker_updated_timestamp(tracker_worksheet) -> None:
-    timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
-    d_stamp = timestamp.strftime('%x')
-    t_stamp = timestamp.strftime('%-I:%M %p')
-    tracker_worksheet.update_value('A2', f'LAST UPDATED: {d_stamp} @ {t_stamp}')
-
-
-def _create_updated_df(tech_tracker_df, mot_df) -> pd.DataFrame:
-    df = tech_tracker_df.copy()
-    df.set_index('job_candidate_id', inplace=True)
-    mot_df.set_index('job_candidate_id', inplace=True)
-    df.update(mot_df)
-    df.reset_index(inplace=True)
-    df.drop(columns=['Start Date - Last Updated', 'Pay Location - Last Updated', 'Main Last Updated'])
-    return df
-
-
-def _get_cleaned_mot_df(hr_mot_worksheet) -> pd.DataFrame:
+def _get_cleared_mot_data(hr_mot_worksheet) -> pd.DataFrame:
     mot_df = hr_mot_worksheet.get_as_df(start=(3, 1), end=(hr_mot_worksheet.rows, hr_mot_worksheet.cols),
                                         has_header=False, include_tailing_empty=False)
     mot_df = mot_df.rename(columns=COLUMN_MAPPINGS)
@@ -67,8 +41,60 @@ def _get_cleaned_mot_df(hr_mot_worksheet) -> pd.DataFrame:
     return mot_df
 
 
-def _fill_in_date_fields(df) -> None:
+def _add_cleared_column_info(tracker_df) -> pd.DataFrame:
+    """Adds cleared columns to new records"""
+    tracker_df['Cleared?'] = ""
+    tracker_df['Cleared Email Sent'] = ""
+    return tracker_df
+
+
+def _get_jobvite_data(sql: MSSQL) -> pd.DataFrame:
+    df = sql.query_from_file('sql/recent_new_hires.sql')
+    df["Start Date"] = pd.to_datetime(df["Start Date"]).dt.strftime("%Y-%m-%d")
+    return df
+
+
+def _generate_sped_column(df):
+    df['SpEd'] = df.apply(_determine_if_sped, axis=1)
+    return df
+
+
+def _determine_if_sped(row):
+    key_substrings = [
+        "Special Education",
+        "Paraeducator",
+        "Mental Health",
+        "Occupational Therapist",
+        "Behavioral",
+        "Psychologist",
+        "Pathologist"
+    ]
+    for substring in key_substrings:
+        if substring in row["Title"]:
+            return "Yes"
+    return "No"
+
+
+def _create_tracker_updated_timestamp(tracker_worksheet) -> None:
+    timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
+    d_stamp = timestamp.strftime('%x')
+    t_stamp = timestamp.strftime('%-I:%M %p')
+    tracker_worksheet.update_value('A2', f'LAST UPDATED: {d_stamp} @ {t_stamp}')
+
+
+def _update_dataframe(stale_df: pd.DataFrame, current_data_df: pd.DataFrame) -> pd.DataFrame:
+    """Generalized func to update one ata frame with data from another"""
+    df = stale_df.copy()
+    df.set_index('job_candidate_id', inplace=True)
+    current_data_df.set_index('job_candidate_id', inplace=True)
+    df.update(current_data_df)
+    df.reset_index(inplace=True)
+    return df
+
+
+def _fill_in_rescinded_and_date_fields(df) -> None:
     today = date.today()
+    df['Rescinded'] = '--'
     df['Date Added'] = today
     df['Start Date - Last Updated'] = today
     df['Pay Location - Last Updated'] = today
@@ -84,9 +110,6 @@ def _get_new_records(tracker_df, mot_df) -> pd.DataFrame:
         how="outer",
         on=["job_candidate_id"]).query('_merge=="left_only"')
     result.drop(["_merge"], axis=1, inplace=True)
-    if not result.empty:
-        result['Rescinded'] = '--'
-        _fill_in_date_fields(result)
     return result
 
 
@@ -101,16 +124,22 @@ def _filter_out_cleared_on_boarders(cleared_ids_df, tech_tracker_df) -> pd.DataF
     return result
 
 
-def _get_rescinded_offers(hr_mot_worksheet) -> list:
-    """HR strikesthrough rescinded offers; this func evaluates for this"""
-    rescinded_offer_ids = list()
-    col = hr_mot_worksheet.get_col(4, include_tailing_empty=False, returnas='cell')
-    for cell in col[2:]:
-        if cell is not None:
-            if cell.text_format is not None:
-                if cell.text_format.get('strikethrough', False):
-                    rescinded_offer_ids.append(cell.value_unformatted)
-    return rescinded_offer_ids
+def _filter_candidates_for_school_year(jobvite_df, school_year):
+    jobvite_df["Start Date"] = pd.to_datetime(jobvite_df["Start Date"])
+    year_2digit = school_year[-2:]
+    year = int(f"20{year_2digit}")  # convert school year to 4 digit year
+    start_of_year = datetime(year - 1, 6, 30)
+    end_of_year = datetime(year, 7, 1)
+    jobvite_df = jobvite_df[
+        (jobvite_df["Start Date"] >= start_of_year) & (jobvite_df["Start Date"] < end_of_year)
+        ]
+    jobvite_df["Start Date"] = jobvite_df["Start Date"].dt.strftime('%m/%d/%Y')
+    return jobvite_df
+
+
+def _get_rescinded_offers(sql: MSSQL) -> list:
+    df = sql.query_from_file('sql/rescinded_offers.sql')
+    return df["job_candidate_id"].to_list()
 
 
 def _update_rescinded_col(id_list, df) -> pd.DataFrame:
@@ -128,7 +157,14 @@ def _compare_dfs(updated_tracker_df, old_tracker_df) -> pd.DataFrame:
     cols_to_compare = ['Start Date', 'Pay Location']
     for col in cols_to_compare:
         df_compared = _merge_for_comparison(updated_tracker_df, old_tracker_df, col)
-        updated_tracker_df = _create_updated_df(updated_tracker_df, df_compared)
+        updated_tracker_df = _update_dataframe(updated_tracker_df, df_compared)
+        updated_tracker_df.drop(
+            columns=[
+                'Start Date - Last Updated',
+                'Pay Location - Last Updated',
+                'Main Last Updated'
+            ]
+        )
     return updated_tracker_df
 
 
@@ -171,30 +207,36 @@ def _get_cleared_ids(spreadsheet, year) -> pd.DataFrame:
 
 
 def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: Spreadsheet, year: str) -> None:
+    sql = MSSQL()
     tech_tracker_sheet = tech_tracker_spreadsheet.worksheet_by_title(f"{year} Tracker")
     tracker_backup_df = _get_and_prep_tracker_df(tech_tracker_sheet)
 
-    hr_mot_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
-    rescinded_offer_ids = _get_rescinded_offers(hr_mot_sheet)
-    hr_mot_df = _get_cleaned_mot_df(hr_mot_sheet)
+    jobvite_df = _get_jobvite_data(sql)
+    jobvite_df = _generate_sped_column(jobvite_df)
+    jobvite_df = _filter_candidates_for_school_year(jobvite_df, year)
+
+    rescinded_offer_ids = _get_rescinded_offers(sql)
 
     # Tech Tracker has ability to clear onboarders who have completed onboarding to an archive sheet
-    # The below filters those onboarders out of the MOT dataset
+    # The below filters those onboarders out of the Jobvite dataset
     cleared_ids_df = _get_cleared_ids(tech_tracker_spreadsheet, year)
-    hr_mot_df = _filter_out_cleared_on_boarders(cleared_ids_df, hr_mot_df)
+    jobvite_df = _filter_out_cleared_on_boarders(cleared_ids_df, jobvite_df)
 
     updated_tracker_df = pd.DataFrame()
 
     if not tracker_backup_df.empty:
-        updated_tracker_df = _create_updated_df(tracker_backup_df, hr_mot_df)
+        updated_tracker_df = _update_dataframe(tracker_backup_df, jobvite_df)
         updated_tracker_df = _compare_dfs(updated_tracker_df, tracker_backup_df)
         _calculate_main_updated_date(updated_tracker_df)
         logging.info('Updating Tech Tracker with data from HR\'s MOT')
     else:
         logging.info('Tech Tracker is empty')
 
-    new_records = _get_new_records(tracker_backup_df, hr_mot_df)
+    new_records = _get_new_records(tracker_backup_df, jobvite_df)
     if not new_records.empty:
+        new_records = _generate_sped_column(new_records)
+        new_records = _add_cleared_column_info(new_records)
+        _fill_in_rescinded_and_date_fields(new_records)
         updated_tracker_df = pd.concat([updated_tracker_df, new_records])
         logging.info(f'Adding {len(new_records)} new records to tracker')
     else:
@@ -205,6 +247,9 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
         _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
 
     if not updated_tracker_df.empty:
+        hr_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
+        hr_cleared_df = _get_cleared_mot_data(hr_sheet)
+        updated_tracker_df = _update_dataframe(updated_tracker_df, hr_cleared_df)
         tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
         sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
         tech_tracker_sheet.sort_range('B5', sheet_dim, basecolumnindex=18, sortorder='DESCENDING')

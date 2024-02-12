@@ -3,4 +3,3 @@
 .DS_Store
 *.json
 app.log
-Pipfile.lock
