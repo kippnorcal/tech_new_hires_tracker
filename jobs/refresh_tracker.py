@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 
 # The order of the columns below determines the order in the Tech Tracker
 COLUMN_MAPPINGS = {
-    3: 'job_candidate_id',
-    51: 'Cleared?',
-    52: 'Cleared Email Sent'
+    3: "job_candidate_id",
+    51: "Cleared?",
+    52: "Cleared Email Sent"
 }
 
 
@@ -33,29 +33,29 @@ def _get_cleared_mot_data(hr_mot_worksheet) -> pd.DataFrame:
     mot_df = mot_df[column_filter].copy()
 
     #  Removing indexes where the job_candidate_id is blank
-    empty_string_indexes = mot_df[mot_df['job_candidate_id'] == '']
+    empty_string_indexes = mot_df[mot_df["job_candidate_id"] == ""]
     mot_df.drop(index=empty_string_indexes.index, inplace=True)
 
     mot_df.astype(str)
-    mot_df['Cleared Email Sent'] = np.where(mot_df['Cleared Email Sent'] == 'TRUE', 'Yes', 'No')
+    mot_df["Cleared Email Sent"] = np.where(mot_df["Cleared Email Sent"] == "TRUE", "Yes", "No")
     return mot_df
 
 
 def _add_cleared_column_info(tracker_df) -> pd.DataFrame:
     """Adds cleared columns to new records"""
-    tracker_df['Cleared?'] = ""
-    tracker_df['Cleared Email Sent'] = ""
+    tracker_df["Cleared?"] = ""
+    tracker_df["Cleared Email Sent"] = ""
     return tracker_df
 
 
 def _get_jobvite_data(sql: MSSQL) -> pd.DataFrame:
-    df = sql.query_from_file('sql/recent_new_hires.sql')
+    df = sql.query_from_file("sql/recent_new_hires.sql")
     df["Start Date"] = pd.to_datetime(df["Start Date"]).dt.strftime("%Y-%m-%d")
     return df
 
 
 def _generate_sped_column(df):
-    df['SpEd'] = df.apply(_determine_if_sped, axis=1)
+    df["SpEd"] = df.apply(_determine_if_sped, axis=1)
     return df
 
 
@@ -77,28 +77,33 @@ def _determine_if_sped(row):
 
 def _create_tracker_updated_timestamp(tracker_worksheet) -> None:
     timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
-    d_stamp = timestamp.strftime('%x')
-    t_stamp = timestamp.strftime('%-I:%M %p')
-    tracker_worksheet.update_value('A2', f'LAST UPDATED: {d_stamp} @ {t_stamp}')
+    d_stamp = timestamp.strftime("%x")
+    t_stamp = timestamp.strftime("%-I:%M %p")
+    tracker_worksheet.update_value("A2", f"LAST UPDATED: {d_stamp} @ {t_stamp}")
 
 
 def _update_dataframe(stale_df: pd.DataFrame, current_data_df: pd.DataFrame) -> pd.DataFrame:
     """Generalized func to update one ata frame with data from another"""
-    df = stale_df.copy()
-    df.set_index('job_candidate_id', inplace=True)
-    current_data_df.set_index('job_candidate_id', inplace=True)
-    df.update(current_data_df)
-    df.reset_index(inplace=True)
+    try:
+        df = stale_df.copy()
+        df.set_index("job_candidate_id", inplace=True)
+        current_data_df.set_index("job_candidate_id", inplace=True)
+        df.update(current_data_df)
+        df.reset_index(inplace=True)
+    except ValueError as error:
+        logger.exception(error)
+        index_str = "\n".join(stale_df["job_candidate_id"].to_list())
+        logger.info(f"Here are the indexes from the tracker dataframe:\n{index_str}")
     return df
 
 
 def _fill_in_rescinded_and_date_fields(df) -> None:
     today = date.today()
-    df['Rescinded'] = '--'
-    df['Date Added'] = today
-    df['Start Date - Last Updated'] = today
-    df['Pay Location - Last Updated'] = today
-    df['Main Last Updated'] = today
+    df["Rescinded"] = "--"
+    df["Date Added"] = today
+    df["Start Date - Last Updated"] = today
+    df["Pay Location - Last Updated"] = today
+    df["Main Last Updated"] = today
 
 
 def _get_new_records(tracker_df, mot_df) -> pd.DataFrame:
@@ -108,7 +113,7 @@ def _get_new_records(tracker_df, mot_df) -> pd.DataFrame:
         ids_df,
         indicator=True,
         how="outer",
-        on=["job_candidate_id"]).query('_merge=="left_only"')
+        on=["job_candidate_id"]).query("_merge=='left_only'")
     result.drop(["_merge"], axis=1, inplace=True)
     return result
 
@@ -119,7 +124,7 @@ def _filter_out_cleared_on_boarders(cleared_ids_df, tech_tracker_df) -> pd.DataF
         cleared_ids_df,
         indicator=True,
         how="outer",
-        on=["job_candidate_id"]).query('_merge=="left_only"')
+        on=["job_candidate_id"]).query("_merge=='left_only'")
     result.drop(["_merge"], axis=1, inplace=True)
     return result
 
@@ -133,36 +138,36 @@ def _filter_candidates_for_school_year(jobvite_df, school_year):
     jobvite_df = jobvite_df[
         (jobvite_df["Start Date"] >= start_of_year) & (jobvite_df["Start Date"] < end_of_year)
         ]
-    jobvite_df["Start Date"] = jobvite_df["Start Date"].dt.strftime('%m/%d/%Y')
+    jobvite_df["Start Date"] = jobvite_df["Start Date"].dt.strftime("%m/%d/%Y")
     return jobvite_df
 
 
 def _get_rescinded_offers(sql: MSSQL) -> list:
-    df = sql.query_from_file('sql/rescinded_offers.sql')
+    df = sql.query_from_file("sql/rescinded_offers.sql")
     return df["job_candidate_id"].to_list()
 
 
 def _update_rescinded_col(id_list, df) -> pd.DataFrame:
-    filtered_for_updates = df.loc[(df['job_candidate_id'].isin(id_list)) & (df['Rescinded'] == '--')]
+    filtered_for_updates = df.loc[(df["job_candidate_id"].isin(id_list)) & (df["Rescinded"] == "--")]
     if not filtered_for_updates.empty:
-        filtered_for_updates['Rescinded'] = f'Yes - {date.today()}'
-        filtered_for_updates.set_index('job_candidate_id', inplace=True)
-        df.set_index('job_candidate_id', inplace=True)
+        filtered_for_updates["Rescinded"] = f"Yes - {date.today()}"
+        filtered_for_updates.set_index("job_candidate_id", inplace=True)
+        df.set_index("job_candidate_id", inplace=True)
         df.update(filtered_for_updates)
         df.reset_index(inplace=True)
     return df
 
 
 def _compare_dfs(updated_tracker_df, old_tracker_df) -> pd.DataFrame:
-    cols_to_compare = ['Start Date', 'Pay Location']
+    cols_to_compare = ["Start Date", "Pay Location"]
     for col in cols_to_compare:
         df_compared = _merge_for_comparison(updated_tracker_df, old_tracker_df, col)
         updated_tracker_df = _update_dataframe(updated_tracker_df, df_compared)
         updated_tracker_df.drop(
             columns=[
-                'Start Date - Last Updated',
-                'Pay Location - Last Updated',
-                'Main Last Updated'
+                "Start Date - Last Updated",
+                "Pay Location - Last Updated",
+                "Main Last Updated"
             ]
         )
     return updated_tracker_df
@@ -178,15 +183,15 @@ def _merge_for_comparison(updated_tracker_df, old_tracker_df, col: str) -> pd.Da
     new_value = f"{col}_x"
     old_value = f"{col}_y"
     update_date_field = f"{col} - Last Updated_x"
-    results = results[['job_candidate_id', new_value, old_value, update_date_field]]
+    results = results[["job_candidate_id", new_value, old_value, update_date_field]]
     results.loc[results[new_value] != results[old_value], update_date_field] = date.today()
     results.rename(columns={update_date_field: update_date_field[:-2]}, inplace=True)
     return results
 
 
 def _calculate_main_updated_date(df) -> None:
-    df['Main Last Updated'] = np.where((df['Start Date - Last Updated'] <= df["Pay Location - Last Updated"]),
-                                       df["Pay Location - Last Updated"], df['Start Date - Last Updated'])
+    df["Main Last Updated"] = np.where((df["Start Date - Last Updated"] <= df["Pay Location - Last Updated"]),
+                                       df["Pay Location - Last Updated"], df["Start Date - Last Updated"])
 
 
 def _get_and_prep_tracker_df(tracker_worksheet) -> pd.DataFrame:
@@ -195,8 +200,8 @@ def _get_and_prep_tracker_df(tracker_worksheet) -> pd.DataFrame:
     df = tracker_worksheet.get_as_df(has_header=True, start="B4", end=(tracker_worksheet.rows, 19),
                                      include_tailing_empty=False)
     df.astype(str)
-    df['Start Date - Last Updated'] = pd.to_datetime(df['Start Date - Last Updated'], format="%Y-%m-%d").dt.date
-    df['Pay Location - Last Updated'] = pd.to_datetime(df['Pay Location - Last Updated'], format="%Y-%m-%d").dt.date
+    df["Start Date - Last Updated"] = pd.to_datetime(df["Start Date - Last Updated"], format="%Y-%m-%d").dt.date
+    df["Pay Location - Last Updated"] = pd.to_datetime(df["Pay Location - Last Updated"], format="%Y-%m-%d").dt.date
     return df
 
 
@@ -228,9 +233,9 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
         updated_tracker_df = _update_dataframe(tracker_backup_df, jobvite_df)
         updated_tracker_df = _compare_dfs(updated_tracker_df, tracker_backup_df)
         _calculate_main_updated_date(updated_tracker_df)
-        logging.info('Updating Tech Tracker with data from HR\'s MOT')
+        logging.info("Updating Tech Tracker with data from HR's MOT")
     else:
-        logging.info('Tech Tracker is empty')
+        logging.info("Tech Tracker is empty")
 
     new_records = _get_new_records(tracker_backup_df, jobvite_df)
     if not new_records.empty:
@@ -238,12 +243,12 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
         new_records = _add_cleared_column_info(new_records)
         _fill_in_rescinded_and_date_fields(new_records)
         updated_tracker_df = pd.concat([updated_tracker_df, new_records])
-        logging.info(f'Adding {len(new_records)} new records to tracker')
+        logging.info(f"Adding {len(new_records)} new records to tracker")
     else:
-        logging.info('No new records to add to Tech Tracker')
+        logging.info("No new records to add to Tech Tracker")
 
     if rescinded_offer_ids:
-        logging.info('Checking for rescinded offers')
+        logging.info("Checking for rescinded offers")
         _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
 
     if not updated_tracker_df.empty:
@@ -252,9 +257,9 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
         updated_tracker_df = _update_dataframe(updated_tracker_df, hr_cleared_df)
         tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
         sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
-        tech_tracker_sheet.sort_range('B5', sheet_dim, basecolumnindex=18, sortorder='DESCENDING')
-        logger.info('Refreshed Tech Tracker')
+        tech_tracker_sheet.sort_range("B5", sheet_dim, basecolumnindex=18, sortorder="DESCENDING")
+        logger.info("Refreshed Tech Tracker")
     else:
-        logger.info('No updates found. Nothing to refresh.')
+        logger.info("No updates found. Nothing to refresh.")
 
     _create_tracker_updated_timestamp(tech_tracker_sheet)
