@@ -1,23 +1,13 @@
 # Tech On-Boarder Provisioning Tracker
 
 ## About
-At a high level, this connector extracts data from HR's Main On-boarding Tracker (MOT), which lives in a Google Sheet, and loads the data into the Tech On-boarder Provisioning Tracker (Tech Tracker), which is another Google Sheet. 
-
-At a granular level, the connector performs the following:
-* A backup copy of the Tech Tracker is created and stored in a Pandas DataFrame
-* Existing records in the Tech Tracker are updated with data from MOT
-* The backup copy the Tech Tracker is compared to the updated Tech Tracker to identify changes to key pieces of data that the Tech Team needs to be aware of
-  * Changes to key pieces of data are tracked by date stamp in a corresponding "Last Updated" column
-* The updated Tech Tracker is then compared with the MOT again to identify records in the MOT that are not in the Tech Tracker
-  * These records are appended to the Tech Tracker and given a date stamp to indicate the date they were added
-* The MOT is checked for rescinded offers to candidates. Rescinded offers are noted in the Tech Tracker
-* There is also a "Main Last Updated" column that always reflects the most recent change to key pieces of data. The data set is sorted by this date
-* A notification message is sent to KIPP NorCal's notifications Slack channel when job is complete
+Querys data from Jobvite for the past 30 days and inserts it into a Google sheet for teh Tech Team to track on-boarders. This job is dependent on HR's MOT for two fields related to employee clearance.
 
 ## Setup
 ### Dependencies
-* Python 3.10
+* Python 3.x
 * Docker
+* See Pipfile for more
 
 ### Environment 
 The connector needs to be set up with a .env file with the following variables:
@@ -30,10 +20,12 @@ HR_MOT_SHEETS_ID=
 # Google Credentials:
 CREDENTIALS_FILE=
 
-# Email notification settings
-GMAIL_USER=
-GMAIL_PWD=
-NOTIF_TO_ADDRESS=
+# Email notification settings 
+MG_API_KEY=
+MG_API_URL=
+MG_DOMAIN=
+FROM_ADDRESS=
+TO_ADDRESS=
 ``````
 
 ### Google Authentication
@@ -44,11 +36,8 @@ From the repo's directory, build Docker image
 ``````
 docker build -t tech-tracker-connector .
 ``````
-If using Apple Silicon, use the `--platform` flag
+
+There is a required runtime argument `--school-year` that accepts year in a YY-YY format.
 ``````
-docker build -t tech-tracker-connector . --platform linux/amd64
-``````
-There is a required runtime argument `--school-year` that accepts year in a XX-XX format.
-``````
-docker run tech-tracker-connector --school-year 23-24
+docker run tech-tracker-connector --school-year 24-25
 ``````
