@@ -248,7 +248,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
     else:
         logging.info("No new records to add to Tech Tracker")
 
-    if rescinded_offer_ids:
+    if rescinded_offer_ids and not new_records.empty:
         logging.info("Checking for rescinded offers")
         _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
 
