@@ -248,11 +248,10 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
     else:
         logging.info("No new records to add to Tech Tracker")
 
-    if rescinded_offer_ids:
-        logging.info("Checking for rescinded offers")
-        _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
-
     if not updated_tracker_df.empty:
+        if rescinded_offer_ids:
+            logging.info("Checking for rescinded offers")
+            _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
         hr_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
         hr_cleared_df = _get_cleared_mot_data(hr_sheet)
         updated_tracker_df = _update_dataframe(updated_tracker_df, hr_cleared_df)
