@@ -220,6 +220,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
     jobvite_df = _get_jobvite_data(sql)
     jobvite_df = _generate_sped_column(jobvite_df)
     jobvite_df = _filter_candidates_for_school_year(jobvite_df, year)
+    jobvite_df.drop_duplicates(subset=["job_candidate_id"], inplace=True)
 
     rescinded_offer_ids = _get_rescinded_offers(sql)
 
