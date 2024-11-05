@@ -62,27 +62,6 @@ def _get_jobvite_data(bq_conn: BigQueryClient) -> pd.DataFrame:
     return df
 
 
-def _generate_sped_column(df):
-    df["SpEd"] = df.apply(_determine_if_sped, axis=1)
-    return df
-
-
-def _determine_if_sped(row):
-    key_substrings = [
-        "Special Education",
-        "Paraeducator",
-        "Mental Health",
-        "Occupational Therapist",
-        "Behavioral",
-        "Psychologist",
-        "Pathologist"
-    ]
-    for substring in key_substrings:
-        if substring in row["Title"]:
-            return "Yes"
-    return "No"
-
-
 def _create_tracker_updated_timestamp(tracker_worksheet) -> None:
     timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
     d_stamp = timestamp.strftime("%x")
