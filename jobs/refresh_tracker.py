@@ -1,12 +1,13 @@
 from datetime import date, datetime
 import logging
 import os
+from time import sleep
 from zoneinfo import ZoneInfo
 
+from gbq_connector import BigQueryClient, DbtClient
 import numpy as np
 import pandas as pd
 from pygsheets import Spreadsheet, Worksheet
-from sqlsorcery import MSSQL
 
 TECH_TRACKER_SHEET = os.getenv("TECH_TRACKER_SHEETS_ID")
 HR_MOT_SHEET = os.getenv("HR_MOT_SHEETS_ID")
@@ -48,9 +49,16 @@ def _add_cleared_column_info(tracker_df) -> pd.DataFrame:
     return tracker_df
 
 
-def _get_jobvite_data(sql: MSSQL) -> pd.DataFrame:
-    df = sql.query_from_file("sql/recent_new_hires.sql")
-    df["Start Date"] = pd.to_datetime(df["Start Date"]).dt.strftime("%Y-%m-%d")
+def _get_jobvite_data(bq_conn: BigQueryClient) -> pd.DataFrame:
+    dbt_conn = DbtClient()
+
+    logging.info("Refreshing dbt; sleeping for 30 seconds")
+    dbt_conn.run_job()
+    sleep(30)
+
+    dataset = os.getenv("GBQ_DATASET")
+    df = bq_conn.get_table_as_df("rpt_jobvite__tracker_data_source", dataset=dataset)
+    df["start_date"] = pd.to_datetime(df["start_date"]).dt.strftime("%Y-%m-%d")
     return df
 
 
