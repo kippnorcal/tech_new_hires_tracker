@@ -200,16 +200,15 @@ def _get_cleared_ids(spreadsheet, year) -> pd.DataFrame:
 
 
 def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: Spreadsheet, year: str) -> None:
-    sql = MSSQL()
+    bq_conn = BigQueryClient()
     tech_tracker_sheet = tech_tracker_spreadsheet.worksheet_by_title(f"{year} Tracker")
     tracker_backup_df = _get_and_prep_tracker_df(tech_tracker_sheet)
 
-    jobvite_df = _get_jobvite_data(sql)
-    jobvite_df = _generate_sped_column(jobvite_df)
+    jobvite_df = _get_jobvite_data(bq_conn)
     jobvite_df = _filter_candidates_for_school_year(jobvite_df, year)
     jobvite_df.drop_duplicates(subset=["job_candidate_id"], inplace=True)
 
-    rescinded_offer_ids = _get_rescinded_offers(sql)
+    rescinded_offer_ids = _get_rescinded_offers(bq_conn)
 
     # Tech Tracker has ability to clear onboarders who have completed onboarding to an archive sheet
     # The below filters those onboarders out of the Jobvite dataset
@@ -228,7 +227,6 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
 
     new_records = _get_new_records(tracker_backup_df, jobvite_df)
     if not new_records.empty:
-        new_records = _generate_sped_column(new_records)
         new_records = _add_cleared_column_info(new_records)
         _fill_in_rescinded_and_date_fields(new_records)
         updated_tracker_df = pd.concat([updated_tracker_df, new_records])
