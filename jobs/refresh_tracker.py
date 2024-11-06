@@ -57,7 +57,7 @@ def _get_jobvite_data(bq_conn: BigQueryClient) -> pd.DataFrame:
     sleep(30)
 
     dataset = os.getenv("GBQ_DATASET")
-    df = bq_conn.get_table_as_df("rpt_jobvite__tracker_data_source", dataset=dataset)
+    df = bq_conn.get_table_as_df("rpt_staff__tech_tracker_data_source", dataset=dataset)
     df["start_date"] = pd.to_datetime(df["start_date"]).dt.strftime("%Y-%m-%d")
     return df
 
