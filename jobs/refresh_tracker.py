@@ -23,6 +23,22 @@ COLUMN_MAPPINGS = {
 }
 
 
+COLUMN_RENAME_MAP = {
+        "job_candidate_id": "job_candidate_id", 
+        "first_name": "First Name",
+        "last_name": "Last Name",
+        "hire_reason": "New, Returners, Rehire or Transfer",
+        "email": "Personal Email",
+        "assigned_work_location": "Work Location",
+        "assigned_pay_location": "Pay Location",
+        "start_date": "Start Date",
+        "title": "Title",
+        "are_you_a_former_or_current_kipp_employee": "Former or Current KIPP", 
+        "sped": "SpEd?", 
+    }
+
+
+
 def _get_cleared_mot_data(hr_mot_worksheet) -> pd.DataFrame:
     mot_df = hr_mot_worksheet.get_as_df(start=(3, 1), end=(hr_mot_worksheet.rows, hr_mot_worksheet.cols),
                                         has_header=False, include_tailing_empty=False)
@@ -207,6 +223,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
     tracker_backup_df = _get_and_prep_tracker_df(tech_tracker_sheet)
 
     jobvite_df = _get_jobvite_data(bq_conn, dataset)
+    jobvite_df = jobvite_df.rename(columns=COLUMN_RENAME_MAP)
     jobvite_df = _filter_candidates_for_school_year(jobvite_df, year)
     jobvite_df.drop_duplicates(subset=["job_candidate_id"], inplace=True)
 
