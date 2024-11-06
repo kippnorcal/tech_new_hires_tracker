@@ -39,7 +39,7 @@ COLUMN_RENAME_MAP = {
 
 
 
-def _get_cleared_mot_data(hr_mot_worksheet) -> pd.DataFrame:
+def _get_cleared_mot_data(hr_mot_worksheet: Worksheet) -> pd.DataFrame:
     mot_df = hr_mot_worksheet.get_as_df(start=(3, 1), end=(hr_mot_worksheet.rows, hr_mot_worksheet.cols),
                                         has_header=False, include_tailing_empty=False)
     mot_df = mot_df.rename(columns=COLUMN_MAPPINGS)
@@ -58,7 +58,7 @@ def _get_cleared_mot_data(hr_mot_worksheet) -> pd.DataFrame:
     return mot_df
 
 
-def _add_cleared_column_info(tracker_df) -> pd.DataFrame:
+def _add_cleared_column_info(tracker_df: pd.DataFrame) -> pd.DataFrame:
     """Adds cleared columns to new records"""
     tracker_df["Cleared?"] = ""
     tracker_df["Cleared Email Sent"] = ""
@@ -77,7 +77,7 @@ def _get_jobvite_data(bq_conn: BigQueryClient, dataset: str) -> pd.DataFrame:
     return df
 
 
-def _create_tracker_updated_timestamp(tracker_worksheet) -> None:
+def _create_tracker_updated_timestamp(tracker_worksheet: Worksheet) -> None:
     timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
     d_stamp = timestamp.strftime("%x")
     t_stamp = timestamp.strftime("%-I:%M %p")
@@ -99,7 +99,7 @@ def _update_dataframe(stale_df: pd.DataFrame, current_data_df: pd.DataFrame) -> 
     return df
 
 
-def _fill_in_rescinded_and_date_fields(df) -> None:
+def _fill_in_rescinded_and_date_fields(df: pd.DataFrame) -> None:
     today = date.today()
     df["Rescinded"] = "--"
     df["Date Added"] = today
@@ -108,7 +108,7 @@ def _fill_in_rescinded_and_date_fields(df) -> None:
     df["Main Last Updated"] = today
 
 
-def _get_new_records(tracker_df, mot_df) -> pd.DataFrame:
+def _get_new_records(tracker_df: pd.DataFrame, mot_df: pd.DataFrame) -> pd.DataFrame:
     ids_df = tracker_df[["job_candidate_id"]].copy()
     result = pd.merge(
         mot_df,
@@ -119,7 +119,7 @@ def _get_new_records(tracker_df, mot_df) -> pd.DataFrame:
     return result.drop(["_merge"], axis=1)
 
 
-def _filter_out_cleared_on_boarders(cleared_ids_df, tech_tracker_df) -> pd.DataFrame:
+def _filter_out_cleared_on_boarders(cleared_ids_df: pd.DataFrame, tech_tracker_df: pd.DataFrame) -> pd.DataFrame:
     result = pd.merge(
         tech_tracker_df,
         cleared_ids_df,
@@ -129,7 +129,7 @@ def _filter_out_cleared_on_boarders(cleared_ids_df, tech_tracker_df) -> pd.DataF
     return result.drop(["_merge"], axis=1)
 
 
-def _filter_candidates_for_school_year(jobvite_df, school_year):
+def _filter_candidates_for_school_year(jobvite_df: pd.DataFrame, school_year: str):
     jobvite_df["Start Date"] = pd.to_datetime(jobvite_df["Start Date"])
     year_2digit = school_year[-2:]
     year = int(f"20{year_2digit}")  # convert school year to 4 digit year
@@ -147,7 +147,7 @@ def _get_rescinded_offers(bq_conn: BigQueryClient, dataset: str) -> list:
     return df["job_candidate_id"].to_list()
 
 
-def _update_rescinded_col(id_list, df) -> pd.DataFrame:
+def _update_rescinded_col(id_list: list, df: pd.DataFrame) -> pd.DataFrame:
     filtered_for_updates = df.loc[(df["job_candidate_id"].isin(id_list)) & (df["Rescinded"] == "--")]
     if not filtered_for_updates.empty:
         filtered_for_updates["Rescinded"] = f"Yes - {date.today()}"
@@ -158,7 +158,7 @@ def _update_rescinded_col(id_list, df) -> pd.DataFrame:
     return df
 
 
-def _compare_date_tracked_columns(updated_tracker_df, old_tracker_df) -> pd.DataFrame:
+def _compare_date_tracked_columns(updated_tracker_df: pd.DataFrame, old_tracker_df: pd.DataFrame) -> pd.DataFrame:
     """Function that will date stamp changes to data in columns"""
     cols_to_compare = ["Start Date", "Pay Location"]
     for col in cols_to_compare:
@@ -174,7 +174,7 @@ def _compare_date_tracked_columns(updated_tracker_df, old_tracker_df) -> pd.Data
     return updated_tracker_df
 
 
-def _merge_for_comparison(updated_tracker_df, old_tracker_df, col: str) -> pd.DataFrame:
+def _merge_for_comparison(updated_tracker_df: pd.DataFrame, old_tracker_df: pd.DataFrame, col: str) -> pd.DataFrame:
     results = pd.merge(
         updated_tracker_df,
         old_tracker_df,
@@ -189,12 +189,12 @@ def _merge_for_comparison(updated_tracker_df, old_tracker_df, col: str) -> pd.Da
     return results.rename(columns={update_date_field: update_date_field[:-2]})
 
 
-def _calculate_main_updated_date(df) -> None:
+def _calculate_main_updated_date(df: pd.DataFrame) -> None:
     df["Main Last Updated"] = np.where((df["Start Date - Last Updated"] <= df["Pay Location - Last Updated"]),
                                        df["Pay Location - Last Updated"], df["Start Date - Last Updated"])
 
 
-def _get_and_prep_tracker_df(tracker_worksheet) -> pd.DataFrame:
+def _get_and_prep_tracker_df(tracker_worksheet: Worksheet) -> pd.DataFrame:
     # Sort range first to eliminate possible blank rows
     tracker_worksheet.sort_range(start="B5", end=(tracker_worksheet.rows, tracker_worksheet.cols), basecolumnindex=2)
     df = tracker_worksheet.get_as_df(has_header=True, start="B4", end=(tracker_worksheet.rows, 19),
@@ -205,7 +205,7 @@ def _get_and_prep_tracker_df(tracker_worksheet) -> pd.DataFrame:
     return df
 
 
-def _get_cleared_ids(spreadsheet, year) -> pd.DataFrame:
+def _get_cleared_ids(spreadsheet: Spreadsheet, year: str) -> pd.DataFrame:
     cleared_sheet = spreadsheet.worksheet_by_title(f"{year} Cleared")
     return cleared_sheet.get_as_df(has_header=True, start="C4", end=(cleared_sheet.rows, 3),
                                    include_tailing_empty=False)
