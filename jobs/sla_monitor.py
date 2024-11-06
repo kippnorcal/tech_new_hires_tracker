@@ -127,16 +127,16 @@ def refresh_sla_source(spreadsheet) -> None:
     logger.info("Removed rescinded hires")
 
     # drop rescinded col
-    agg_df.drop("Rescinded", axis="columns", inplace=True)
+    agg_df = agg_df.drop("Rescinded", axis="columns")
     logger.info("Dropped rescinded column")
 
     # Rename Columns
-    agg_df.rename(columns=COLUMN_RENAME_MAP, inplace=True)
+    agg_df = agg_df.rename(columns=COLUMN_RENAME_MAP)
     logger.info("Renamed columns")
 
     # COMBINE FIRST AND LAST NAMES
     agg_df['Staff_Name'] = agg_df["First Name"].astype(str) + ' ' + agg_df["Last Name"].astype(str)
-    agg_df.drop(["First Name", "Last Name"], axis="columns", inplace=True)
+    agg_df = agg_df.drop(["First Name", "Last Name"], axis="columns")
 
     # HIRE MONTH
     _datefields_to_dt_obj(agg_df)

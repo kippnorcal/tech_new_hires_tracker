@@ -51,7 +51,7 @@ def _get_cleared_mot_data(hr_mot_worksheet) -> pd.DataFrame:
 
     #  Removing indexes where the job_candidate_id is blank
     empty_string_indexes = mot_df[mot_df["job_candidate_id"] == ""]
-    mot_df.drop(index=empty_string_indexes.index, inplace=True)
+    mot_df = mot_df.drop(index=empty_string_indexes.index)
 
     mot_df.astype(str)
     mot_df["Cleared Email Sent"] = np.where(mot_df["Cleared Email Sent"] == "TRUE", "Yes", "No")
@@ -88,10 +88,10 @@ def _update_dataframe(stale_df: pd.DataFrame, current_data_df: pd.DataFrame) -> 
     """Generalized func to update one dataframe with data from another"""
     try:
         df = stale_df.copy()
-        df.set_index("job_candidate_id", inplace=True)
-        current_data_df.set_index("job_candidate_id", inplace=True)
+        df = df.set_index("job_candidate_id")
+        current_data_df = current_data_df.set_index("job_candidate_id")
         df.update(current_data_df)
-        df.reset_index(inplace=True)
+        df = df.reset_index()
     except ValueError as error:
         logger.exception(error)
         index_str = "\n".join(stale_df["job_candidate_id"].to_list())
@@ -116,8 +116,7 @@ def _get_new_records(tracker_df, mot_df) -> pd.DataFrame:
         indicator=True,
         how="outer",
         on=["job_candidate_id"]).query("_merge=='left_only'")
-    result.drop(["_merge"], axis=1, inplace=True)
-    return result
+    return result.drop(["_merge"], axis=1)
 
 
 def _filter_out_cleared_on_boarders(cleared_ids_df, tech_tracker_df) -> pd.DataFrame:
@@ -127,8 +126,7 @@ def _filter_out_cleared_on_boarders(cleared_ids_df, tech_tracker_df) -> pd.DataF
         indicator=True,
         how="outer",
         on=["job_candidate_id"]).query("_merge=='left_only'")
-    result.drop(["_merge"], axis=1, inplace=True)
-    return result
+    return result.drop(["_merge"], axis=1)
 
 
 def _filter_candidates_for_school_year(jobvite_df, school_year):
@@ -153,10 +151,10 @@ def _update_rescinded_col(id_list, df) -> pd.DataFrame:
     filtered_for_updates = df.loc[(df["job_candidate_id"].isin(id_list)) & (df["Rescinded"] == "--")]
     if not filtered_for_updates.empty:
         filtered_for_updates["Rescinded"] = f"Yes - {date.today()}"
-        filtered_for_updates.set_index("job_candidate_id", inplace=True)
-        df.set_index("job_candidate_id", inplace=True)
+        filtered_for_updates = filtered_for_updates.set_index("job_candidate_id")
+        df = df.set_index("job_candidate_id")
         df.update(filtered_for_updates)
-        df.reset_index(inplace=True)
+        df = df.reset_index()
     return df
 
 
@@ -188,8 +186,7 @@ def _merge_for_comparison(updated_tracker_df, old_tracker_df, col: str) -> pd.Da
     update_date_field = f"{col} - Last Updated_x"
     results = results[["job_candidate_id", new_value, old_value, update_date_field]]
     results.loc[results[new_value] != results[old_value], update_date_field] = date.today()
-    results.rename(columns={update_date_field: update_date_field[:-2]}, inplace=True)
-    return results
+    return results.rename(columns={update_date_field: update_date_field[:-2]})
 
 
 def _calculate_main_updated_date(df) -> None:
@@ -225,7 +222,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
     jobvite_df = _get_jobvite_data(bq_conn, dataset)
     jobvite_df = jobvite_df.rename(columns=COLUMN_RENAME_MAP)
     jobvite_df = _filter_candidates_for_school_year(jobvite_df, year)
-    jobvite_df.drop_duplicates(subset=["job_candidate_id"], inplace=True)
+    jobvite_df = jobvite_df.drop_duplicates(subset=["job_candidate_id"])
 
     rescinded_offer_ids = _get_rescinded_offers(bq_conn, dataset)
 
