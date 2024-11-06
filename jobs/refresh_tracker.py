@@ -48,15 +48,14 @@ def _add_cleared_column_info(tracker_df) -> pd.DataFrame:
     tracker_df["Cleared Email Sent"] = ""
     return tracker_df
 
-
-def _get_jobvite_data(bq_conn: BigQueryClient) -> pd.DataFrame:
+def _refresh_dbt() -> None:
     dbt_conn = DbtClient()
-
     logging.info("Refreshing dbt; sleeping for 30 seconds")
     dbt_conn.run_job()
     sleep(30)
 
-    dataset = os.getenv("GBQ_DATASET")
+
+def _get_jobvite_data(bq_conn: BigQueryClient, dataset: str) -> pd.DataFrame:
     df = bq_conn.get_table_as_df("rpt_staff__tech_tracker_data_source", dataset=dataset)
     df["start_date"] = pd.to_datetime(df["start_date"]).dt.strftime("%Y-%m-%d")
     return df
@@ -129,8 +128,8 @@ def _filter_candidates_for_school_year(jobvite_df, school_year):
     return jobvite_df
 
 
-def _get_rescinded_offers(sql: MSSQL) -> list:
-    df = sql.query_from_file("sql/rescinded_offers.sql")
+def _get_rescinded_offers(bq_conn: BigQueryClient, dataset: str) -> list:
+    df = bq_conn.get_table_as_df("rpt_staff__tech_tracker_rescinded_offers", dataset=dataset)
     return df["job_candidate_id"].to_list()
 
 
@@ -200,15 +199,18 @@ def _get_cleared_ids(spreadsheet, year) -> pd.DataFrame:
 
 
 def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: Spreadsheet, year: str) -> None:
+    _refresh_dbt()
+    dataset = os.getenv("GBQ_DATASET")
     bq_conn = BigQueryClient()
+
     tech_tracker_sheet = tech_tracker_spreadsheet.worksheet_by_title(f"{year} Tracker")
     tracker_backup_df = _get_and_prep_tracker_df(tech_tracker_sheet)
 
-    jobvite_df = _get_jobvite_data(bq_conn)
+    jobvite_df = _get_jobvite_data(bq_conn, dataset)
     jobvite_df = _filter_candidates_for_school_year(jobvite_df, year)
     jobvite_df.drop_duplicates(subset=["job_candidate_id"], inplace=True)
 
-    rescinded_offer_ids = _get_rescinded_offers(bq_conn)
+    rescinded_offer_ids = _get_rescinded_offers(bq_conn, dataset)
 
     # Tech Tracker has ability to clear onboarders who have completed onboarding to an archive sheet
     # The below filters those onboarders out of the Jobvite dataset
