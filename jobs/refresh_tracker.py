@@ -72,7 +72,7 @@ def _refresh_dbt() -> None:
 
 
 def _get_jobvite_data(bq_conn: BigQueryClient, dataset: str) -> pd.DataFrame:
-    df = bq_conn.get_table_as_df("rpt_staff__tech_tracker_data_source", dataset=dataset)
+    df = bq_conn.get_table_as_df("rpt_staff__tech_onboarding_tracker_data_source", dataset=dataset)
     df["start_date"] = pd.to_datetime(df["start_date"]).dt.strftime("%Y-%m-%d")
     return df
 
