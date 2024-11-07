@@ -5,7 +5,7 @@ Querys data from Jobvite for the past 30 days and inserts it into a Google sheet
 
 ## Setup
 ### Dependencies
-* Python 3.x
+* Python3
 * Docker
 * See Pipfile for more
 
@@ -13,6 +13,17 @@ Querys data from Jobvite for the past 30 days and inserts it into a Google sheet
 The connector needs to be set up with a .env file with the following variables:
 
 ``````
+# dbt variables
+DBT_ACCOUNT_ID=
+DBT_JOB_ID=
+DBT_BASE_URL=
+DBT_PERSONAL_ACCESS_TOKEN=
+
+# Google Storage Info
+GOOGLE_APPLICATION_CREDENTIALS=
+GBQ_PROJECT=
+GBQ_DATASET=
+
 # Sheet IDs
 TECH_TRACKER_SHEETS_ID=
 HR_MOT_SHEETS_ID=
