@@ -4,7 +4,7 @@ from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
-from pygsheets import Worksheet
+from pygsheets import Spreadsheet
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ COLUMN_RENAME_MAP = {
 }
 
 
-def _datefields_to_dt_obj(df) -> None:
+def _datefields_to_dt_obj(df: pd.DataFrame) -> None:
     df['StartDate_LastUpdated'] = pd.to_datetime(df['StartDate_LastUpdated'], format="%Y-%m-%d")
     df['PayLocation_LastUpdated'] = pd.to_datetime(df['PayLocation_LastUpdated'], format="%Y-%m-%d")
     df['DateCleared'] = pd.to_datetime(df['DateCleared'], format="%m/%d/%Y")
@@ -41,12 +41,12 @@ def _datefields_to_dt_obj(df) -> None:
     df['Main_LastUpdated'] = pd.to_datetime(df['Main_LastUpdated'], format="%Y-%m-%d")
 
 
-def _compare_dates_new_col(df, new_col: str, date_col1: str, date_col2: str) -> None:
+def _compare_dates_new_col(df: pd.DataFrame, new_col: str, date_col1: str, date_col2: str) -> None:
     """Creates a new column with 1, 0 values by comparing two date columns"""
     df[new_col] = np.where(df[date_col1] < df[date_col2], 1, 0)
 
 
-def _eval_sla_met(df) -> None:
+def _eval_sla_met(df: pd.DataFrame) -> None:
     """Evaluating if the Service Level Agreement has been met for each record.
     If SLA has been met, set value at 1
     If SLA has not been met, set value to 0
@@ -61,7 +61,7 @@ def _eval_sla_met(df) -> None:
     df["TechCleared_MetSLA_Boolean"] = df["TechCleared_MetSLA_Boolean"].replace(np.nan, '')
 
 
-def _eval_sla_denominator_field(df) -> None:
+def _eval_sla_denominator_field(df: pd.DataFrame) -> None:
     """Evaluating if record should be included in SLA denominator
     If DateCleared is not null, then set value to 1
     If DateCleared is null, then evaluate if SLA deadline has passed, If True, set value to 1"""
@@ -73,7 +73,7 @@ def _eval_sla_denominator_field(df) -> None:
     )
 
 
-def _eval_tech_timeliness(df) -> None:
+def _eval_tech_timeliness(df: pd.DataFrame) -> None:
     """If DateCleared, then calculate how on-time tech was provisioned"""
     df["TechCleared_Timeliness"] = np.where(
         pd.isnull(df["DateCleared"]),
@@ -82,7 +82,7 @@ def _eval_tech_timeliness(df) -> None:
     )
 
 
-def _identify_tracker_cleared_sheets(spreadsheet) -> Tuple[List[pd.DataFrame], List[pd.DataFrame]]:
+def _identify_tracker_cleared_sheets(spreadsheet: Spreadsheet) -> Tuple[List[pd.DataFrame], List[pd.DataFrame]]:
     sheet_list = spreadsheet.worksheets()
     cleared = []
     tracker = []
@@ -112,7 +112,7 @@ def _identify_tracker_cleared_sheets(spreadsheet) -> Tuple[List[pd.DataFrame], L
     return cleared, tracker
 
 
-def refresh_sla_source(spreadsheet) -> None:
+def refresh_sla_source(spreadsheet: Spreadsheet) -> None:
     sla_sheet = spreadsheet.worksheet_by_title("SLA_data_source")
     cleared_dfs, tracker_dfs = _identify_tracker_cleared_sheets(spreadsheet)
 
@@ -127,16 +127,16 @@ def refresh_sla_source(spreadsheet) -> None:
     logger.info("Removed rescinded hires")
 
     # drop rescinded col
-    agg_df.drop("Rescinded", axis="columns", inplace=True)
+    agg_df = agg_df.drop("Rescinded", axis="columns")
     logger.info("Dropped rescinded column")
 
     # Rename Columns
-    agg_df.rename(columns=COLUMN_RENAME_MAP, inplace=True)
+    agg_df = agg_df.rename(columns=COLUMN_RENAME_MAP)
     logger.info("Renamed columns")
 
     # COMBINE FIRST AND LAST NAMES
     agg_df['Staff_Name'] = agg_df["First Name"].astype(str) + ' ' + agg_df["Last Name"].astype(str)
-    agg_df.drop(["First Name", "Last Name"], axis="columns", inplace=True)
+    agg_df = agg_df.drop(["First Name", "Last Name"], axis="columns")
 
     # HIRE MONTH
     _datefields_to_dt_obj(agg_df)
