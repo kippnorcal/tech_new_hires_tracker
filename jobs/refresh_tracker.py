@@ -143,7 +143,7 @@ def _filter_candidates_for_school_year(jobvite_df: pd.DataFrame, school_year: st
 
 
 def _get_rescinded_offers(bq_conn: BigQueryClient, dataset: str) -> list:
-    df = bq_conn.get_table_as_df("rpt_staff__tech_tracker_rescinded_offers", dataset=dataset)
+    df = bq_conn.get_table_as_df("rpt_staff__tech_onboarding_tracker_rescinded_offers", dataset=dataset)
     return df["job_candidate_id"].to_list()
 
 
