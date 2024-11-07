@@ -2,6 +2,7 @@ from datetime import date, datetime
 import logging
 import os
 from time import sleep
+from typing import Union
 from zoneinfo import ZoneInfo
 
 from gbq_connector import BigQueryClient, DbtClient
@@ -142,9 +143,12 @@ def _filter_candidates_for_school_year(jobvite_df: pd.DataFrame, school_year: st
     return jobvite_df
 
 
-def _get_rescinded_offers(bq_conn: BigQueryClient, dataset: str) -> list:
+def _get_rescinded_offers(bq_conn: BigQueryClient, dataset: str) -> Union[list, None]:
     df = bq_conn.get_table_as_df("rpt_staff__tech_onboarding_tracker_rescinded_offers", dataset=dataset)
-    return df["job_candidate_id"].to_list()
+    if df is not None:
+        return df["job_candidate_id"].to_list()
+    else:
+        return None
 
 
 def _update_rescinded_col(id_list: list, df: pd.DataFrame) -> pd.DataFrame:
@@ -251,9 +255,11 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
         logging.info("No new records to add to Tech Tracker")
 
     if not updated_tracker_df.empty:
-        if rescinded_offer_ids:
-            logging.info("Checking for rescinded offers")
+        if rescinded_offer_ids is not None:
+            logging.info("Identified rescinded offers")
             _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
+            for offer_id in rescinded_offer_ids:
+                logging.info(f"Removing {offer_id}")
         hr_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
         hr_cleared_df = _get_cleared_mot_data(hr_sheet)
         updated_tracker_df = _update_dataframe(updated_tracker_df, hr_cleared_df)
