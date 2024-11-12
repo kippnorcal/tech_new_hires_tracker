@@ -139,7 +139,7 @@ def _filter_candidates_for_school_year(jobvite_df: pd.DataFrame, school_year: st
     jobvite_df = jobvite_df[
         (jobvite_df["Start Date"] >= start_of_year) & (jobvite_df["Start Date"] < end_of_year)
         ]
-    jobvite_df["Start Date"] = jobvite_df["Start Date"].dt.strftime("%m/%d/%Y")
+    jobvite_df.loc[:, "Start Date"] = jobvite_df["Start Date"].dt.strftime("%m/%d/%Y")
     return jobvite_df
 
 
