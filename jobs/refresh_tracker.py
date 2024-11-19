@@ -16,14 +16,14 @@ GOOGLE_CREDENTIALS = os.getenv("CREDENTIALS_FILE")
 
 logger = logging.getLogger(__name__)
 
-# The order of the columns below determines the order in the Tech Tracker
+# For filtering columns from HR Tracker
 COLUMN_MAPPINGS = {
     3: "job_candidate_id",
     51: "Cleared?",
     52: "Cleared Email Sent"
 }
 
-
+# Rename fields from dbt report to match tracker headers
 REPORT_COLUMN_RENAME_MAP = {
         "job_candidate_id": "job_candidate_id", 
         "first_name": "First Name",
@@ -129,29 +129,29 @@ def _get_and_prep_tracker_df(tracker_worksheet: Worksheet) -> pd.DataFrame:
     return df
 
 
-def _get_cleared_ids(spreadsheet: Spreadsheet, year: str) -> pd.DataFrame:
+def _get_cleared_tech_ids(spreadsheet: Spreadsheet, year: str) -> pd.DataFrame:
     cleared_sheet = spreadsheet.worksheet_by_title(f"{year} Cleared")
     return cleared_sheet.get_as_df(has_header=True, start="C4", end=(cleared_sheet.rows, 3),
                                    include_tailing_empty=False)
 
 
-def _get_cleared_mot_data(hr_mot_worksheet: Worksheet) -> pd.DataFrame:
-    mot_df = hr_mot_worksheet.get_as_df(start=(3, 1), end=(hr_mot_worksheet.rows, hr_mot_worksheet.cols),
+def _get_cleared_to_hire_data_from_hr_tracker(hr_worksheet: Worksheet) -> pd.DataFrame:
+    hr_tracker_df = hr_worksheet.get_as_df(start=(3, 1), end=(hr_worksheet.rows, hr_worksheet.cols),
                                         has_header=False, include_tailing_empty=False)
-    mot_df = mot_df.rename(columns=COLUMN_MAPPINGS)
+    hr_tracker_df = hr_tracker_df.rename(columns=COLUMN_MAPPINGS)
 
     #  Filtering unneeded columns
     column_filter = list(COLUMN_MAPPINGS.values())
-    mot_df[column_filter].copy()
-    mot_df = mot_df[column_filter].copy()
+    hr_tracker_df[column_filter].copy()
+    hr_tracker_df = hr_tracker_df[column_filter].copy()
 
     #  Removing indexes where the job_candidate_id is blank
-    empty_string_indexes = mot_df[mot_df["job_candidate_id"] == ""]
-    mot_df = mot_df.drop(index=empty_string_indexes.index)
+    empty_string_indexes = hr_tracker_df[hr_tracker_df["job_candidate_id"] == ""]
+    hr_tracker_df = hr_tracker_df.drop(index=empty_string_indexes.index)
 
-    mot_df.astype(str)
-    mot_df["Cleared Email Sent"] = np.where(mot_df["Cleared Email Sent"] == "TRUE", "Yes", "No")
-    return mot_df
+    hr_tracker_df.astype(str)
+    hr_tracker_df["Cleared Email Sent"] = np.where(hr_tracker_df["Cleared Email Sent"] == "TRUE", "Yes", "No")
+    return hr_tracker_df
 
 
 def _get_jobvite_data(bq_conn: BigQueryClient, dataset: str) -> pd.DataFrame:
@@ -160,10 +160,10 @@ def _get_jobvite_data(bq_conn: BigQueryClient, dataset: str) -> pd.DataFrame:
     return df
 
 
-def _get_new_records(tracker_df: pd.DataFrame, mot_df: pd.DataFrame) -> pd.DataFrame:
+def _get_new_records(tracker_df: pd.DataFrame, jobvite_df: pd.DataFrame) -> pd.DataFrame:
     ids_df = tracker_df[["job_candidate_id"]].copy()
     result = pd.merge(
-        mot_df,
+        jobvite_df,
         ids_df,
         indicator=True,
         how="outer",
@@ -200,9 +200,9 @@ def _merge_for_comparison(updated_tracker_df: pd.DataFrame, old_tracker_df: pd.D
     return results.rename(columns={update_date_field: update_date_field[:-2]})
 
 
-def _pull_cleared_field_from_hr_onboarding_tracker(updated_tracker_df: pd.DataFrame, hr_mot_spreadsheet: Spreadsheet, year: str) -> pd.DataFrame:
-    hr_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
-    hr_cleared_df = _get_cleared_mot_data(hr_sheet)
+def _pull_cleared_field_from_hr_onboarding_tracker(updated_tracker_df: pd.DataFrame, hr_spreadsheet: Spreadsheet, year: str) -> pd.DataFrame:
+    hr_sheet = hr_spreadsheet.worksheet_by_title(f"Master_{year}")
+    hr_cleared_df = _get_cleared_to_hire_data_from_hr_tracker(hr_sheet)
     return _update_dataframe(updated_tracker_df, hr_cleared_df)
 
 
@@ -255,7 +255,7 @@ def _update_tracker_data(tracker_backup_df: pd.DataFrame, jobvite_df: pd.DataFra
     return updated_tracker_df
 
 
-def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: Spreadsheet, year: str) -> None:
+def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_spreadsheet: Spreadsheet, year: str) -> None:
     _refresh_dbt()
     dataset = os.getenv("GBQ_DATASET")
     bq_conn = BigQueryClient()
@@ -266,7 +266,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
 
     # Tech Tracker has ability to clear onboarders who have completed onboarding to an archive sheet
     # The below filters those onboarders out of the Jobvite dataset
-    cleared_ids_df = _get_cleared_ids(tech_tracker_spreadsheet, year)
+    cleared_ids_df = _get_cleared_tech_ids(tech_tracker_spreadsheet, year)
     jobvite_df = _filter_out_cleared_on_boarders(cleared_ids_df, jobvite_df)
 
     updated_tracker_df = pd.DataFrame()
@@ -289,7 +289,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
         if rescinded_offer_ids is not None:
             _rescind_records_from_tracker(updated_tracker_df, rescinded_offer_ids)
         
-        updated_tracker_df = _pull_cleared_field_from_hr_onboarding_tracker(updated_tracker_df, hr_mot_spreadsheet, year)
+        updated_tracker_df = _pull_cleared_field_from_hr_onboarding_tracker(updated_tracker_df, hr_spreadsheet, year)
         
         # Converting Start Date field to string for insertion
         updated_tracker_df["Start Date"] = updated_tracker_df["Start Date"].dt.strftime("%m/%d/%Y")
