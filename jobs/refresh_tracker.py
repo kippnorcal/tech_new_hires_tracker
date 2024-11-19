@@ -74,7 +74,7 @@ def _refresh_dbt() -> None:
 
 def _get_jobvite_data(bq_conn: BigQueryClient, dataset: str) -> pd.DataFrame:
     df = bq_conn.get_table_as_df("rpt_staff__tech_onboarding_tracker_data_source", dataset=dataset)
-    df["start_date"] = pd.to_datetime(df["start_date"]).dt.strftime("%Y-%m-%d")
+    df["start_date"] = pd.to_datetime(df["start_date"])
     return df
 
 
@@ -131,7 +131,6 @@ def _filter_out_cleared_on_boarders(cleared_ids_df: pd.DataFrame, tech_tracker_d
 
 
 def _filter_candidates_for_school_year(jobvite_df: pd.DataFrame, school_year: str):
-    jobvite_df["Start Date"] = pd.to_datetime(jobvite_df["Start Date"])
     year_2digit = school_year[-2:]
     year = int(f"20{year_2digit}")  # convert school year to 4 digit year
     start_of_year = datetime(year - 1, 6, 30)
@@ -139,7 +138,6 @@ def _filter_candidates_for_school_year(jobvite_df: pd.DataFrame, school_year: st
     jobvite_df = jobvite_df[
         (jobvite_df["Start Date"] >= start_of_year) & (jobvite_df["Start Date"] < end_of_year)
         ]
-    jobvite_df.loc[:, "Start Date"] = jobvite_df["Start Date"].dt.strftime("%m/%d/%Y")
     return jobvite_df
 
 
@@ -206,6 +204,7 @@ def _get_and_prep_tracker_df(tracker_worksheet: Worksheet) -> pd.DataFrame:
     df.astype(str)
     df["Start Date - Last Updated"] = pd.to_datetime(df["Start Date - Last Updated"], format="%Y-%m-%d").dt.date
     df["Pay Location - Last Updated"] = pd.to_datetime(df["Pay Location - Last Updated"], format="%Y-%m-%d").dt.date
+    df["Start Date"] = pd.to_datetime(df["Start Date"], format="%m/%d/%Y").dt.date
     return df
 
 
@@ -263,6 +262,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
         hr_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
         hr_cleared_df = _get_cleared_mot_data(hr_sheet)
         updated_tracker_df = _update_dataframe(updated_tracker_df, hr_cleared_df)
+        updated_tracker_df["Start Date"] = updated_tracker_df["Start Date"].dt.strftime("%m/%d/%Y")
         tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
         sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
         tech_tracker_sheet.sort_range("B5", sheet_dim, basecolumnindex=18, sortorder="DESCENDING")
