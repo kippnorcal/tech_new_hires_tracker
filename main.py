@@ -12,7 +12,7 @@ from utils.arg_parser import create_parser
 from utils.logger_config import get_logger
 
 TECH_TRACKER_SHEET = os.getenv("TECH_TRACKER_SHEETS_ID")
-HR_MOT_SHEET = os.getenv("HR_MOT_SHEETS_ID")
+HR_TRACKER_SHEET = os.getenv("HR_TRACKER_SHEETS_ID")
 GOOGLE_CREDENTIALS = os.getenv("CREDENTIALS_FILE")
 
 # Create Parser
@@ -36,7 +36,7 @@ def _refresh_dbt() -> None:
 
 def main(notifications):
     tech_spreadsheet = create_sheet_connection(TECH_TRACKER_SHEET)
-    hr_mot_spreadsheet = create_sheet_connection(HR_MOT_SHEET)
+    hr_mot_spreadsheet = create_sheet_connection(HR_TRACKER_SHEET)
     if ARGS.sla_monitor_refresh:
         notifications.extend_job_name("- SLA Monitor Refresh")
         refresh_sla_source(tech_spreadsheet)
