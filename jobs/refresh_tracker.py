@@ -214,6 +214,45 @@ def _get_cleared_ids(spreadsheet: Spreadsheet, year: str) -> pd.DataFrame:
                                    include_tailing_empty=False)
 
 
+def _update_tracker_data(tracker_backup_df, jobvite_df):
+        updated_tracker_df = _update_dataframe(tracker_backup_df, jobvite_df)
+        updated_tracker_df = _compare_date_tracked_columns(updated_tracker_df, tracker_backup_df)
+        _calculate_main_updated_date(updated_tracker_df)
+        return updated_tracker_df
+
+
+def _append_new_records_to_tracker(updated_tracker_df, new_records):
+        new_records = _add_cleared_column_info(new_records)
+        _fill_in_rescinded_and_date_fields(new_records)
+        return pd.concat([updated_tracker_df, new_records])
+
+
+def _rescind_records_from_tracker(updated_tracker_df, rescinded_offer_ids):
+    logging.info("Identified rescinded offers")
+    _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
+    for offer_id in rescinded_offer_ids:
+        logging.info(f"Removing {offer_id}")
+
+
+def _pull_cleared_field_from_hr_onboarding_tracker(updated_tracker_df, hr_mot_spreadsheet, year):
+    hr_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
+    hr_cleared_df = _get_cleared_mot_data(hr_sheet)
+    return _update_dataframe(updated_tracker_df, hr_cleared_df)
+
+
+def _insert_updated_data_to_google_sheets(updated_tracker_df, tech_tracker_sheet):
+    tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
+    sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
+    tech_tracker_sheet.sort_range("B5", sheet_dim, basecolumnindex=18, sortorder="DESCENDING")
+
+
+def _get_and_prep_jobvite_data(bq_conn, dataset, year):
+    jobvite_df = _get_jobvite_data(bq_conn, dataset)
+    jobvite_df = jobvite_df.rename(columns=COLUMN_RENAME_MAP)
+    jobvite_df = _filter_candidates_for_school_year(jobvite_df, year)
+    return jobvite_df.drop_duplicates(subset=["job_candidate_id"])
+
+
 def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: Spreadsheet, year: str) -> None:
     _refresh_dbt()
     dataset = os.getenv("GBQ_DATASET")
@@ -222,10 +261,7 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
     tech_tracker_sheet = tech_tracker_spreadsheet.worksheet_by_title(f"{year} Tracker")
     tracker_backup_df = _get_and_prep_tracker_df(tech_tracker_sheet)
 
-    jobvite_df = _get_jobvite_data(bq_conn, dataset)
-    jobvite_df = jobvite_df.rename(columns=COLUMN_RENAME_MAP)
-    jobvite_df = _filter_candidates_for_school_year(jobvite_df, year)
-    jobvite_df = jobvite_df.drop_duplicates(subset=["job_candidate_id"])
+    jobvite_df = _get_and_prep_jobvite_data(bq_conn, dataset, year)
 
     rescinded_offer_ids = _get_rescinded_offers(bq_conn, dataset)
 
@@ -237,35 +273,25 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: S
     updated_tracker_df = pd.DataFrame()
 
     if not tracker_backup_df.empty:
-        updated_tracker_df = _update_dataframe(tracker_backup_df, jobvite_df)
-        updated_tracker_df = _compare_date_tracked_columns(updated_tracker_df, tracker_backup_df)
-        _calculate_main_updated_date(updated_tracker_df)
-        logging.info("Updating Tech Tracker with data from HR's MOT")
+        updated_tracker_df = _update_tracker_data(tracker_backup_df, jobvite_df)
+        logging.info("Updating existing Tech Tracker data with data from Jobvite")
     else:
         logging.info("Tech Tracker is empty")
 
     new_records = _get_new_records(tracker_backup_df, jobvite_df)
     if not new_records.empty:
-        new_records = _add_cleared_column_info(new_records)
-        _fill_in_rescinded_and_date_fields(new_records)
-        updated_tracker_df = pd.concat([updated_tracker_df, new_records])
+        updated_tracker_df = _append_new_records_to_tracker(updated_tracker_df, new_records)
         logging.info(f"Adding {len(new_records)} new records to tracker")
     else:
         logging.info("No new records to add to Tech Tracker")
 
     if not updated_tracker_df.empty:
         if rescinded_offer_ids is not None:
-            logging.info("Identified rescinded offers")
-            _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
-            for offer_id in rescinded_offer_ids:
-                logging.info(f"Removing {offer_id}")
-        hr_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
-        hr_cleared_df = _get_cleared_mot_data(hr_sheet)
-        updated_tracker_df = _update_dataframe(updated_tracker_df, hr_cleared_df)
+            _rescind_records_from_tracker(updated_tracker_df, rescinded_offer_ids)
+        
+        updated_tracker_df = _pull_cleared_field_from_hr_onboarding_tracker(updated_tracker_df, hr_mot_spreadsheet, year)
         updated_tracker_df["Start Date"] = updated_tracker_df["Start Date"].dt.strftime("%m/%d/%Y")
-        tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
-        sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
-        tech_tracker_sheet.sort_range("B5", sheet_dim, basecolumnindex=18, sortorder="DESCENDING")
+        _insert_updated_data_to_google_sheets(updated_tracker_df, tech_tracker_sheet)
         logger.info("Refreshed Tech Tracker")
     else:
         logger.info("No updates found. Nothing to refresh.")
