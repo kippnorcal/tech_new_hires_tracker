@@ -24,7 +24,7 @@ COLUMN_MAPPINGS = {
 }
 
 
-COLUMN_RENAME_MAP = {
+REPORT_COLUMN_RENAME_MAP = {
         "job_candidate_id": "job_candidate_id", 
         "first_name": "First Name",
         "last_name": "Last Name",
@@ -38,6 +38,101 @@ COLUMN_RENAME_MAP = {
         "sped": "SpEd?", 
     }
 
+
+def _add_cleared_column_info(tracker_df: pd.DataFrame) -> pd.DataFrame:
+    """Adds cleared columns to new records"""
+    tracker_df["Cleared?"] = ""
+    tracker_df["Cleared Email Sent"] = ""
+    return tracker_df
+
+
+def _append_new_records_to_tracker(updated_tracker_df: pd.DataFrame, new_records: pd.DataFrame) -> pd.DataFrame:
+    new_records = _add_cleared_column_info(new_records)
+    _fill_in_rescinded_and_date_fields(new_records)
+    return pd.concat([updated_tracker_df, new_records])
+
+
+def _calculate_main_updated_date(df: pd.DataFrame) -> None:
+    df["Main Last Updated"] = np.where((df["Start Date - Last Updated"] <= df["Pay Location - Last Updated"]),
+                                       df["Pay Location - Last Updated"], df["Start Date - Last Updated"])
+
+
+def _create_tracker_updated_timestamp(tracker_worksheet: Worksheet) -> None:
+    timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
+    d_stamp = timestamp.strftime("%x")
+    t_stamp = timestamp.strftime("%-I:%M %p")
+    tracker_worksheet.update_value("A2", f"LAST UPDATED: {d_stamp} @ {t_stamp}")
+
+
+def _compare_date_tracked_columns(updated_tracker_df: pd.DataFrame, old_tracker_df: pd.DataFrame) -> pd.DataFrame:
+    """Function that will date stamp changes to data in columns"""
+    cols_to_compare = ["Start Date", "Pay Location"]
+    for col in cols_to_compare:
+        df_compared = _merge_for_comparison(updated_tracker_df, old_tracker_df, col)
+        updated_tracker_df = _update_dataframe(updated_tracker_df, df_compared)
+        updated_tracker_df.drop(
+            columns=[
+                "Start Date - Last Updated",
+                "Pay Location - Last Updated",
+                "Main Last Updated"
+            ]
+        )
+    return updated_tracker_df
+
+
+def _fill_in_rescinded_and_date_fields(df: pd.DataFrame) -> None:
+    today = date.today()
+    df["Rescinded"] = "--"
+    df["Date Added"] = today
+    df["Start Date - Last Updated"] = today
+    df["Pay Location - Last Updated"] = today
+    df["Main Last Updated"] = today
+
+
+def _filter_candidates_for_school_year(jobvite_df: pd.DataFrame, school_year: str):
+    year_2digit = school_year[-2:]
+    year = int(f"20{year_2digit}")  # convert school year to 4 digit year
+    start_of_year = datetime(year - 1, 6, 30)
+    end_of_year = datetime(year, 7, 1)
+    jobvite_df = jobvite_df[
+        (jobvite_df["Start Date"] >= start_of_year) & (jobvite_df["Start Date"] < end_of_year)
+        ]
+    return jobvite_df
+
+
+def _filter_out_cleared_on_boarders(cleared_ids_df: pd.DataFrame, tech_tracker_df: pd.DataFrame) -> pd.DataFrame:
+    result = pd.merge(
+        tech_tracker_df,
+        cleared_ids_df,
+        indicator=True,
+        how="outer",
+        on=["job_candidate_id"]).query("_merge=='left_only'")
+    return result.drop(["_merge"], axis=1)
+
+
+def _get_and_prep_jobvite_data(bq_conn, dataset, year)  -> pd.DataFrame:
+    jobvite_df = _get_jobvite_data(bq_conn, dataset)
+    jobvite_df = jobvite_df.rename(columns=REPORT_COLUMN_RENAME_MAP)
+    jobvite_df = _filter_candidates_for_school_year(jobvite_df, year)
+    return jobvite_df.drop_duplicates(subset=["job_candidate_id"])
+
+
+def _get_and_prep_tracker_df(tracker_worksheet: Worksheet) -> pd.DataFrame:
+    # Sort range first to eliminate possible blank rows
+    tracker_worksheet.sort_range(start="B5", end=(tracker_worksheet.rows, tracker_worksheet.cols), basecolumnindex=2)
+    df = tracker_worksheet.get_as_df(has_header=True, start="B4", end=(tracker_worksheet.rows, 19),
+                                     include_tailing_empty=False)
+    df.astype(str)
+    df["Start Date - Last Updated"] = pd.to_datetime(df["Start Date - Last Updated"], format="%Y-%m-%d").dt.date
+    df["Pay Location - Last Updated"] = pd.to_datetime(df["Pay Location - Last Updated"], format="%Y-%m-%d").dt.date
+    df["Start Date"] = pd.to_datetime(df["Start Date"], format="%m/%d/%Y").dt.date
+    return df
+
+
+def _get_cleared_ids(spreadsheet: Spreadsheet, year: str) -> pd.DataFrame:
+    cleared_sheet = spreadsheet.worksheet_by_title(f"{year} Cleared")
+    return cleared_sheet.get_as_df(has_header=True, start="C4", end=(cleared_sheet.rows, 3),
+                                   include_tailing_empty=False)
 
 
 def _get_cleared_mot_data(hr_mot_worksheet: Worksheet) -> pd.DataFrame:
@@ -59,54 +154,10 @@ def _get_cleared_mot_data(hr_mot_worksheet: Worksheet) -> pd.DataFrame:
     return mot_df
 
 
-def _add_cleared_column_info(tracker_df: pd.DataFrame) -> pd.DataFrame:
-    """Adds cleared columns to new records"""
-    tracker_df["Cleared?"] = ""
-    tracker_df["Cleared Email Sent"] = ""
-    return tracker_df
-
-def _refresh_dbt() -> None:
-    dbt_conn = DbtClient()
-    logging.info("Refreshing dbt; sleeping for 30 seconds")
-    dbt_conn.run_job()
-    sleep(30)
-
-
 def _get_jobvite_data(bq_conn: BigQueryClient, dataset: str) -> pd.DataFrame:
     df = bq_conn.get_table_as_df("rpt_staff__tech_onboarding_tracker_data_source", dataset=dataset)
     df["start_date"] = pd.to_datetime(df["start_date"])
     return df
-
-
-def _create_tracker_updated_timestamp(tracker_worksheet: Worksheet) -> None:
-    timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
-    d_stamp = timestamp.strftime("%x")
-    t_stamp = timestamp.strftime("%-I:%M %p")
-    tracker_worksheet.update_value("A2", f"LAST UPDATED: {d_stamp} @ {t_stamp}")
-
-
-def _update_dataframe(stale_df: pd.DataFrame, current_data_df: pd.DataFrame) -> pd.DataFrame:
-    """Generalized func to update one dataframe with data from another"""
-    try:
-        df = stale_df.copy()
-        df = df.set_index("job_candidate_id")
-        current_data_df = current_data_df.set_index("job_candidate_id")
-        df.update(current_data_df)
-        df = df.reset_index()
-    except ValueError as error:
-        logger.exception(error)
-        index_str = "\n".join(stale_df["job_candidate_id"].to_list())
-        logger.info(f"Here are the indexes from the tracker dataframe:\n{index_str}")
-    return df
-
-
-def _fill_in_rescinded_and_date_fields(df: pd.DataFrame) -> None:
-    today = date.today()
-    df["Rescinded"] = "--"
-    df["Date Added"] = today
-    df["Start Date - Last Updated"] = today
-    df["Pay Location - Last Updated"] = today
-    df["Main Last Updated"] = today
 
 
 def _get_new_records(tracker_df: pd.DataFrame, mot_df: pd.DataFrame) -> pd.DataFrame:
@@ -120,27 +171,6 @@ def _get_new_records(tracker_df: pd.DataFrame, mot_df: pd.DataFrame) -> pd.DataF
     return result.drop(["_merge"], axis=1)
 
 
-def _filter_out_cleared_on_boarders(cleared_ids_df: pd.DataFrame, tech_tracker_df: pd.DataFrame) -> pd.DataFrame:
-    result = pd.merge(
-        tech_tracker_df,
-        cleared_ids_df,
-        indicator=True,
-        how="outer",
-        on=["job_candidate_id"]).query("_merge=='left_only'")
-    return result.drop(["_merge"], axis=1)
-
-
-def _filter_candidates_for_school_year(jobvite_df: pd.DataFrame, school_year: str):
-    year_2digit = school_year[-2:]
-    year = int(f"20{year_2digit}")  # convert school year to 4 digit year
-    start_of_year = datetime(year - 1, 6, 30)
-    end_of_year = datetime(year, 7, 1)
-    jobvite_df = jobvite_df[
-        (jobvite_df["Start Date"] >= start_of_year) & (jobvite_df["Start Date"] < end_of_year)
-        ]
-    return jobvite_df
-
-
 def _get_rescinded_offers(bq_conn: BigQueryClient, dataset: str) -> Union[list, None]:
     df = bq_conn.get_table_as_df("rpt_staff__tech_onboarding_tracker_rescinded_offers", dataset=dataset)
     if df is not None:
@@ -149,31 +179,10 @@ def _get_rescinded_offers(bq_conn: BigQueryClient, dataset: str) -> Union[list, 
         return None
 
 
-def _update_rescinded_col(id_list: list, df: pd.DataFrame) -> pd.DataFrame:
-    filtered_for_updates = df.loc[(df["job_candidate_id"].isin(id_list)) & (df["Rescinded"] == "--")]
-    if not filtered_for_updates.empty:
-        filtered_for_updates["Rescinded"] = f"Yes - {date.today()}"
-        filtered_for_updates = filtered_for_updates.set_index("job_candidate_id")
-        df = df.set_index("job_candidate_id")
-        df.update(filtered_for_updates)
-        df = df.reset_index()
-    return df
-
-
-def _compare_date_tracked_columns(updated_tracker_df: pd.DataFrame, old_tracker_df: pd.DataFrame) -> pd.DataFrame:
-    """Function that will date stamp changes to data in columns"""
-    cols_to_compare = ["Start Date", "Pay Location"]
-    for col in cols_to_compare:
-        df_compared = _merge_for_comparison(updated_tracker_df, old_tracker_df, col)
-        updated_tracker_df = _update_dataframe(updated_tracker_df, df_compared)
-        updated_tracker_df.drop(
-            columns=[
-                "Start Date - Last Updated",
-                "Pay Location - Last Updated",
-                "Main Last Updated"
-            ]
-        )
-    return updated_tracker_df
+def _insert_updated_data_to_google_sheets(updated_tracker_df: pd.DataFrame, tech_tracker_sheet: Spreadsheet) -> None:
+    tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
+    sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
+    tech_tracker_sheet.sort_range("B5", sheet_dim, basecolumnindex=18, sortorder="DESCENDING")
 
 
 def _merge_for_comparison(updated_tracker_df: pd.DataFrame, old_tracker_df: pd.DataFrame, col: str) -> pd.DataFrame:
@@ -191,40 +200,17 @@ def _merge_for_comparison(updated_tracker_df: pd.DataFrame, old_tracker_df: pd.D
     return results.rename(columns={update_date_field: update_date_field[:-2]})
 
 
-def _calculate_main_updated_date(df: pd.DataFrame) -> None:
-    df["Main Last Updated"] = np.where((df["Start Date - Last Updated"] <= df["Pay Location - Last Updated"]),
-                                       df["Pay Location - Last Updated"], df["Start Date - Last Updated"])
+def _pull_cleared_field_from_hr_onboarding_tracker(updated_tracker_df: pd.DataFrame, hr_mot_spreadsheet: Spreadsheet, year: str) -> pd.DataFrame:
+    hr_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
+    hr_cleared_df = _get_cleared_mot_data(hr_sheet)
+    return _update_dataframe(updated_tracker_df, hr_cleared_df)
 
 
-def _get_and_prep_tracker_df(tracker_worksheet: Worksheet) -> pd.DataFrame:
-    # Sort range first to eliminate possible blank rows
-    tracker_worksheet.sort_range(start="B5", end=(tracker_worksheet.rows, tracker_worksheet.cols), basecolumnindex=2)
-    df = tracker_worksheet.get_as_df(has_header=True, start="B4", end=(tracker_worksheet.rows, 19),
-                                     include_tailing_empty=False)
-    df.astype(str)
-    df["Start Date - Last Updated"] = pd.to_datetime(df["Start Date - Last Updated"], format="%Y-%m-%d").dt.date
-    df["Pay Location - Last Updated"] = pd.to_datetime(df["Pay Location - Last Updated"], format="%Y-%m-%d").dt.date
-    df["Start Date"] = pd.to_datetime(df["Start Date"], format="%m/%d/%Y").dt.date
-    return df
-
-
-def _get_cleared_ids(spreadsheet: Spreadsheet, year: str) -> pd.DataFrame:
-    cleared_sheet = spreadsheet.worksheet_by_title(f"{year} Cleared")
-    return cleared_sheet.get_as_df(has_header=True, start="C4", end=(cleared_sheet.rows, 3),
-                                   include_tailing_empty=False)
-
-
-def _update_tracker_data(tracker_backup_df: pd.DataFrame, jobvite_df: pd.DataFrame) -> pd.DataFrame:
-    updated_tracker_df = _update_dataframe(tracker_backup_df, jobvite_df)
-    updated_tracker_df = _compare_date_tracked_columns(updated_tracker_df, tracker_backup_df)
-    _calculate_main_updated_date(updated_tracker_df)
-    return updated_tracker_df
-
-
-def _append_new_records_to_tracker(updated_tracker_df: pd.DataFrame, new_records: pd.DataFrame) -> pd.DataFrame:
-    new_records = _add_cleared_column_info(new_records)
-    _fill_in_rescinded_and_date_fields(new_records)
-    return pd.concat([updated_tracker_df, new_records])
+def _refresh_dbt() -> None:
+    dbt_conn = DbtClient()
+    logging.info("Refreshing dbt; sleeping for 30 seconds")
+    dbt_conn.run_job()
+    sleep(30)
 
 
 def _rescind_records_from_tracker(updated_tracker_df: pd.DataFrame, rescinded_offer_ids: list) -> pd.DataFrame:
@@ -235,23 +221,38 @@ def _rescind_records_from_tracker(updated_tracker_df: pd.DataFrame, rescinded_of
     return updated_tracker_df
 
 
-def _pull_cleared_field_from_hr_onboarding_tracker(updated_tracker_df: pd.DataFrame, hr_mot_spreadsheet: Spreadsheet, year: str) -> pd.DataFrame:
-    hr_sheet = hr_mot_spreadsheet.worksheet_by_title(f"Master_{year}")
-    hr_cleared_df = _get_cleared_mot_data(hr_sheet)
-    return _update_dataframe(updated_tracker_df, hr_cleared_df)
+def _update_dataframe(stale_df: pd.DataFrame, current_data_df: pd.DataFrame) -> pd.DataFrame:
+    """Generalized func to update one dataframe with data from another"""
+    try:
+        df = stale_df.copy()
+        df = df.set_index("job_candidate_id")
+        current_data_df = current_data_df.set_index("job_candidate_id")
+        df.update(current_data_df)
+        df = df.reset_index()
+    except ValueError as error:
+        logger.exception(error)
+        index_str = "\n".join(stale_df["job_candidate_id"].to_list())
+        logger.info(f"Here are the indexes from the tracker dataframe:\n{index_str}")
+    return df
 
 
-def _insert_updated_data_to_google_sheets(updated_tracker_df: pd.DataFrame, tech_tracker_sheet: Spreadsheet) -> None:
-    tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
-    sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
-    tech_tracker_sheet.sort_range("B5", sheet_dim, basecolumnindex=18, sortorder="DESCENDING")
+
+def _update_rescinded_col(id_list: list, df: pd.DataFrame) -> pd.DataFrame:
+    filtered_for_updates = df.loc[(df["job_candidate_id"].isin(id_list)) & (df["Rescinded"] == "--")]
+    if not filtered_for_updates.empty:
+        filtered_for_updates["Rescinded"] = f"Yes - {date.today()}"
+        filtered_for_updates = filtered_for_updates.set_index("job_candidate_id")
+        df = df.set_index("job_candidate_id")
+        df.update(filtered_for_updates)
+        df = df.reset_index()
+    return df
 
 
-def _get_and_prep_jobvite_data(bq_conn, dataset, year)  -> pd.DataFrame:
-    jobvite_df = _get_jobvite_data(bq_conn, dataset)
-    jobvite_df = jobvite_df.rename(columns=COLUMN_RENAME_MAP)
-    jobvite_df = _filter_candidates_for_school_year(jobvite_df, year)
-    return jobvite_df.drop_duplicates(subset=["job_candidate_id"])
+def _update_tracker_data(tracker_backup_df: pd.DataFrame, jobvite_df: pd.DataFrame) -> pd.DataFrame:
+    updated_tracker_df = _update_dataframe(tracker_backup_df, jobvite_df)
+    updated_tracker_df = _compare_date_tracked_columns(updated_tracker_df, tracker_backup_df)
+    _calculate_main_updated_date(updated_tracker_df)
+    return updated_tracker_df
 
 
 def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_mot_spreadsheet: Spreadsheet, year: str) -> None:
