@@ -10,9 +10,6 @@ import numpy as np
 import pandas as pd
 from pygsheets import Spreadsheet, Worksheet
 
-TECH_TRACKER_SHEET = os.getenv("TECH_TRACKER_SHEETS_ID")
-HR_MOT_SHEET = os.getenv("HR_MOT_SHEETS_ID")
-GOOGLE_CREDENTIALS = os.getenv("CREDENTIALS_FILE")
 
 logger = logging.getLogger(__name__)
 
