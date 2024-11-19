@@ -15,5 +15,11 @@ def create_parser():
         help="Refreshes Tech's SLA monitor data source",
         action="store_true"
     )
+    parser.add_argument(
+        "--dbt-refresh",
+        dest="dbt_refresh",
+        help="Refreshes dbt before running updating tracker",
+        action="store_true"
+    )
 
     return parser

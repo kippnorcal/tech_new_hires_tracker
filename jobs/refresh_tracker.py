@@ -1,11 +1,10 @@
 from datetime import date, datetime
 import logging
 import os
-from time import sleep
 from typing import Union
 from zoneinfo import ZoneInfo
 
-from gbq_connector import BigQueryClient, DbtClient
+from gbq_connector import BigQueryClient
 import numpy as np
 import pandas as pd
 from pygsheets import Spreadsheet, Worksheet
@@ -203,13 +202,6 @@ def _pull_cleared_field_from_hr_onboarding_tracker(updated_tracker_df: pd.DataFr
     return _update_dataframe(updated_tracker_df, hr_cleared_df)
 
 
-def _refresh_dbt() -> None:
-    dbt_conn = DbtClient()
-    logging.info("Refreshing dbt; sleeping for 30 seconds")
-    dbt_conn.run_job()
-    sleep(30)
-
-
 def _rescind_records_from_tracker(updated_tracker_df: pd.DataFrame, rescinded_offer_ids: list) -> pd.DataFrame:
     logging.info("Identified rescinded offers")
     updated_tracker_df = _update_rescinded_col(rescinded_offer_ids, updated_tracker_df)
@@ -253,7 +245,6 @@ def _update_tracker_data(tracker_backup_df: pd.DataFrame, jobvite_df: pd.DataFra
 
 
 def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_spreadsheet: Spreadsheet, year: str) -> None:
-    _refresh_dbt()
     dataset = os.getenv("GBQ_DATASET")
     bq_conn = BigQueryClient()
     jobvite_df = _get_and_prep_jobvite_data(bq_conn, dataset, year)
