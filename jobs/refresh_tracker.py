@@ -31,7 +31,7 @@ REPORT_COLUMN_RENAME_MAP = {
         "start_date": "Start Date",
         "title": "Title",
         "are_you_a_former_or_current_kipp_employee": "Former or Current KIPP", 
-        "sped": "SpEd?", 
+        "sped": "SpEd", 
     }
 
 
