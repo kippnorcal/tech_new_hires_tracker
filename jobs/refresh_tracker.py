@@ -121,7 +121,7 @@ def _get_and_prep_tracker_df(tracker_worksheet: Worksheet) -> pd.DataFrame:
     df.astype(str)
     df["Start Date - Last Updated"] = pd.to_datetime(df["Start Date - Last Updated"], format="%Y-%m-%d").dt.date
     df["Pay Location - Last Updated"] = pd.to_datetime(df["Pay Location - Last Updated"], format="%Y-%m-%d").dt.date
-    df["Start Date"] = pd.to_datetime(df["Start Date"], format="%m/%d/%Y").dt.date
+    df["Start Date"] = pd.to_datetime(df["Start Date"], format="%m/%d/%Y")
     return df
 
 
