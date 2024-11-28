@@ -12,6 +12,16 @@ from pygsheets import Spreadsheet, Worksheet
 
 logger = logging.getLogger(__name__)
 
+# Tech Tracker Cell References
+TECH_TRACKER_BASE_ROW = 5  # -1 to include
+TECH_TRACKER_BASE_COL = 2
+TECH_TRACKER_COL_WIDTH = 19
+
+# HR Tracker Cell References
+HR_TRACKER_BASE_ROW = 5
+HR_TRACKER_BASE_COL = 1
+HR_TRACKER_COL_WIDTH = 55
+
 # For filtering columns from HR Tracker
 COLUMN_MAPPINGS = {
     4: "job_candidate_id",
@@ -115,9 +125,18 @@ def _get_and_prep_jobvite_data(bq_conn, dataset, year)  -> pd.DataFrame:
 
 def _get_and_prep_tracker_df(tracker_worksheet: Worksheet) -> pd.DataFrame:
     # Sort range first to eliminate possible blank rows
-    tracker_worksheet.sort_range(start="B5", end=(tracker_worksheet.rows, tracker_worksheet.cols), basecolumnindex=2)
-    df = tracker_worksheet.get_as_df(has_header=True, start="B4", end=(tracker_worksheet.rows, 19),
-                                     include_tailing_empty=False)
+    tracker_worksheet.sort_range(
+        start=(TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL),
+        end=(tracker_worksheet.rows, tracker_worksheet.cols),
+        basecolumnindex=2
+        )
+    # -1 to include headers
+    df = tracker_worksheet.get_as_df(
+        has_header=True,
+        start=(TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL - 1),
+        end=(tracker_worksheet.rows, TECH_TRACKER_COL_WIDTH),
+        include_tailing_empty=False
+        )
     df.astype(str)
     df["Start Date - Last Updated"] = pd.to_datetime(df["Start Date - Last Updated"], format="%Y-%m-%d").dt.date
     df["Pay Location - Last Updated"] = pd.to_datetime(df["Pay Location - Last Updated"], format="%Y-%m-%d").dt.date
@@ -132,8 +151,12 @@ def _get_cleared_tech_ids(spreadsheet: Spreadsheet, year: str) -> pd.DataFrame:
 
 
 def _get_cleared_to_hire_data_from_hr_tracker(hr_worksheet: Worksheet) -> pd.DataFrame:
-    hr_tracker_df = hr_worksheet.get_as_df(start=(3, 1), end=(hr_worksheet.rows, hr_worksheet.cols),
-                                        has_header=False, include_tailing_empty=False)
+    hr_tracker_df = hr_worksheet.get_as_df(
+        start=(HR_TRACKER_BASE_ROW, HR_TRACKER_BASE_COL),
+        end=(hr_worksheet.rows, HR_TRACKER_COL_WIDTH),
+        has_header=False,
+        include_tailing_empty=True
+        )
     hr_tracker_df = hr_tracker_df.rename(columns=COLUMN_MAPPINGS)
 
     #  Filtering unneeded columns
@@ -176,9 +199,9 @@ def _get_rescinded_offers(bq_conn: BigQueryClient, dataset: str) -> Union[list, 
 
 
 def _insert_updated_data_to_google_sheets(updated_tracker_df: pd.DataFrame, tech_tracker_sheet: Spreadsheet) -> None:
-    tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
+    tech_tracker_sheet.set_dataframe(updated_tracker_df, (TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL), copy_head=False)
     sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
-    tech_tracker_sheet.sort_range("B5", sheet_dim, basecolumnindex=18, sortorder="DESCENDING")
+    tech_tracker_sheet.sort_range((TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL), sheet_dim, basecolumnindex=18, sortorder="DESCENDING")
 
 
 def _merge_for_comparison(updated_tracker_df: pd.DataFrame, old_tracker_df: pd.DataFrame, col: str) -> pd.DataFrame:
