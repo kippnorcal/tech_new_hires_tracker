@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 TECH_TRACKER_BASE_ROW = 5  # -1 to include
 TECH_TRACKER_BASE_COL = 2
 TECH_TRACKER_COL_WIDTH = 19
+TECH_TIMESTAMP_CELL_REF = "A2"
 
 # HR Tracker Cell References
 HR_TRACKER_BASE_ROW = 5
@@ -67,7 +68,7 @@ def _create_tracker_updated_timestamp(tracker_worksheet: Worksheet) -> None:
     timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
     d_stamp = timestamp.strftime("%x")
     t_stamp = timestamp.strftime("%-I:%M %p")
-    tracker_worksheet.update_value("A2", f"LAST UPDATED: {d_stamp} @ {t_stamp}")
+    tracker_worksheet.update_value(TECH_TIMESTAMP_CELL_REF, f"LAST UPDATED: {d_stamp} @ {t_stamp}")
 
 
 def _compare_date_tracked_columns(updated_tracker_df: pd.DataFrame, old_tracker_df: pd.DataFrame) -> pd.DataFrame:
@@ -133,7 +134,7 @@ def _get_and_prep_tracker_df(tracker_worksheet: Worksheet) -> pd.DataFrame:
     # -1 to include headers
     df = tracker_worksheet.get_as_df(
         has_header=True,
-        start=(TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL - 1),
+        start=(TECH_TRACKER_BASE_ROW -1, TECH_TRACKER_BASE_COL),
         end=(tracker_worksheet.rows, TECH_TRACKER_COL_WIDTH),
         include_tailing_empty=False
         )
@@ -280,12 +281,13 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_spreadsheet: Sprea
     # The below filters those onboarders out of the Jobvite dataset
     cleared_ids_df = _get_cleared_tech_ids(tech_tracker_spreadsheet, year)
     jobvite_df = _filter_out_cleared_on_boarders(cleared_ids_df, jobvite_df)
+    logging.info(f"Found {len(jobvite_df)} records to add or update")
 
     updated_tracker_df = pd.DataFrame()
 
     if not tracker_backup_df.empty:
         updated_tracker_df = _update_tracker_data(tracker_backup_df, jobvite_df)
-        logging.info(f"Updating Tech Tracker sheet {tracker_name} with data from Jobvite")
+        logging.info(f"Updating sheet {tracker_name} with data from Jobvite")
     else:
         logging.info(f"Tech Tracker sheet {tracker_name} is empty")
 
