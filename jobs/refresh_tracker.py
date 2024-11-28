@@ -12,11 +12,22 @@ from pygsheets import Spreadsheet, Worksheet
 
 logger = logging.getLogger(__name__)
 
+# Tech Tracker Cell References
+TECH_TRACKER_BASE_ROW = 5  # -1 to include
+TECH_TRACKER_BASE_COL = 2
+TECH_TRACKER_COL_WIDTH = 19
+TECH_TIMESTAMP_CELL_REF = "A2"
+
+# HR Tracker Cell References
+HR_TRACKER_BASE_ROW = 5
+HR_TRACKER_BASE_COL = 1
+HR_TRACKER_COL_WIDTH = 55
+
 # For filtering columns from HR Tracker
 COLUMN_MAPPINGS = {
-    3: "job_candidate_id",
-    51: "Cleared?",
-    52: "Cleared Email Sent"
+    4: "job_candidate_id",
+    47: "Cleared?",
+    48: "Cleared Email Sent"
 }
 
 # Rename fields from dbt report to match tracker headers
@@ -57,7 +68,7 @@ def _create_tracker_updated_timestamp(tracker_worksheet: Worksheet) -> None:
     timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
     d_stamp = timestamp.strftime("%x")
     t_stamp = timestamp.strftime("%-I:%M %p")
-    tracker_worksheet.update_value("A2", f"LAST UPDATED: {d_stamp} @ {t_stamp}")
+    tracker_worksheet.update_value(TECH_TIMESTAMP_CELL_REF, f"LAST UPDATED: {d_stamp} @ {t_stamp}")
 
 
 def _compare_date_tracked_columns(updated_tracker_df: pd.DataFrame, old_tracker_df: pd.DataFrame) -> pd.DataFrame:
@@ -115,9 +126,18 @@ def _get_and_prep_jobvite_data(bq_conn, dataset, year)  -> pd.DataFrame:
 
 def _get_and_prep_tracker_df(tracker_worksheet: Worksheet) -> pd.DataFrame:
     # Sort range first to eliminate possible blank rows
-    tracker_worksheet.sort_range(start="B5", end=(tracker_worksheet.rows, tracker_worksheet.cols), basecolumnindex=2)
-    df = tracker_worksheet.get_as_df(has_header=True, start="B4", end=(tracker_worksheet.rows, 19),
-                                     include_tailing_empty=False)
+    tracker_worksheet.sort_range(
+        start=(TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL),
+        end=(tracker_worksheet.rows, tracker_worksheet.cols),
+        basecolumnindex=2
+        )
+    # -1 to include headers
+    df = tracker_worksheet.get_as_df(
+        has_header=True,
+        start=(TECH_TRACKER_BASE_ROW -1, TECH_TRACKER_BASE_COL),
+        end=(tracker_worksheet.rows, TECH_TRACKER_COL_WIDTH),
+        include_tailing_empty=False
+        )
     df.astype(str)
     df["Start Date - Last Updated"] = pd.to_datetime(df["Start Date - Last Updated"], format="%Y-%m-%d").dt.date
     df["Pay Location - Last Updated"] = pd.to_datetime(df["Pay Location - Last Updated"], format="%Y-%m-%d").dt.date
@@ -132,8 +152,12 @@ def _get_cleared_tech_ids(spreadsheet: Spreadsheet, year: str) -> pd.DataFrame:
 
 
 def _get_cleared_to_hire_data_from_hr_tracker(hr_worksheet: Worksheet) -> pd.DataFrame:
-    hr_tracker_df = hr_worksheet.get_as_df(start=(3, 1), end=(hr_worksheet.rows, hr_worksheet.cols),
-                                        has_header=False, include_tailing_empty=False)
+    hr_tracker_df = hr_worksheet.get_as_df(
+        start=(HR_TRACKER_BASE_ROW, HR_TRACKER_BASE_COL),
+        end=(hr_worksheet.rows, HR_TRACKER_COL_WIDTH),
+        has_header=False,
+        include_tailing_empty=True
+        )
     hr_tracker_df = hr_tracker_df.rename(columns=COLUMN_MAPPINGS)
 
     #  Filtering unneeded columns
@@ -176,9 +200,9 @@ def _get_rescinded_offers(bq_conn: BigQueryClient, dataset: str) -> Union[list, 
 
 
 def _insert_updated_data_to_google_sheets(updated_tracker_df: pd.DataFrame, tech_tracker_sheet: Spreadsheet) -> None:
-    tech_tracker_sheet.set_dataframe(updated_tracker_df, "B5", copy_head=False)
+    tech_tracker_sheet.set_dataframe(updated_tracker_df, (TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL), copy_head=False)
     sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
-    tech_tracker_sheet.sort_range("B5", sheet_dim, basecolumnindex=18, sortorder="DESCENDING")
+    tech_tracker_sheet.sort_range((TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL), sheet_dim, basecolumnindex=18, sortorder="DESCENDING")
 
 
 def _merge_for_comparison(updated_tracker_df: pd.DataFrame, old_tracker_df: pd.DataFrame, col: str) -> pd.DataFrame:
@@ -197,7 +221,7 @@ def _merge_for_comparison(updated_tracker_df: pd.DataFrame, old_tracker_df: pd.D
 
 
 def _pull_cleared_field_from_hr_onboarding_tracker(updated_tracker_df: pd.DataFrame, hr_spreadsheet: Spreadsheet, year: str) -> pd.DataFrame:
-    hr_sheet = hr_spreadsheet.worksheet_by_title(f"Master_{year}")
+    hr_sheet = hr_spreadsheet.worksheet_by_title(f"Main {year}")
     hr_cleared_df = _get_cleared_to_hire_data_from_hr_tracker(hr_sheet)
     return _update_dataframe(updated_tracker_df, hr_cleared_df)
 
@@ -249,28 +273,30 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_spreadsheet: Sprea
     bq_conn = BigQueryClient()
     jobvite_df = _get_and_prep_jobvite_data(bq_conn, dataset, year)
 
-    tech_tracker_sheet = tech_tracker_spreadsheet.worksheet_by_title(f"{year} Tracker")
+    tracker_name = f"{year} Tracker"
+    tech_tracker_sheet = tech_tracker_spreadsheet.worksheet_by_title(tracker_name)
     tracker_backup_df = _get_and_prep_tracker_df(tech_tracker_sheet)
 
     # Tech Tracker has ability to clear onboarders who have completed onboarding to an archive sheet
     # The below filters those onboarders out of the Jobvite dataset
     cleared_ids_df = _get_cleared_tech_ids(tech_tracker_spreadsheet, year)
     jobvite_df = _filter_out_cleared_on_boarders(cleared_ids_df, jobvite_df)
+    logging.info(f"Found {len(jobvite_df)} records to add or update")
 
     updated_tracker_df = pd.DataFrame()
 
     if not tracker_backup_df.empty:
         updated_tracker_df = _update_tracker_data(tracker_backup_df, jobvite_df)
-        logging.info("Updating existing Tech Tracker data with data from Jobvite")
+        logging.info(f"Updating sheet {tracker_name} with data from Jobvite")
     else:
-        logging.info("Tech Tracker is empty")
+        logging.info(f"Tech Tracker sheet {tracker_name} is empty")
 
     new_records = _get_new_records(tracker_backup_df, jobvite_df)
     if not new_records.empty:
         updated_tracker_df = _append_new_records_to_tracker(updated_tracker_df, new_records)
-        logging.info(f"Adding {len(new_records)} new records to tracker")
+        logging.info(f"Adding {len(new_records)} new records to sheet {tracker_name}")
     else:
-        logging.info("No new records to add to Tech Tracker")
+        logging.info(f"No new records to add to tracker sheet {tracker_name}")
 
     if not updated_tracker_df.empty:
         rescinded_offer_ids = _get_rescinded_offers(bq_conn, dataset)
@@ -283,8 +309,8 @@ def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_spreadsheet: Sprea
         updated_tracker_df["Start Date"] = updated_tracker_df["Start Date"].dt.strftime("%m/%d/%Y")
         
         _insert_updated_data_to_google_sheets(updated_tracker_df, tech_tracker_sheet)
-        logger.info("Refreshed Tech Tracker")
+        logger.info(f"Finished refreshing tracker sheet {tracker_name}")
     else:
-        logger.info("No updates found. Nothing to refresh.")
+        logger.info(f"No updates found. Nothing to refresh in sheet {tracker_name}")
 
     _create_tracker_updated_timestamp(tech_tracker_sheet)
