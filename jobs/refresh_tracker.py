@@ -24,10 +24,10 @@ HR_TRACKER_BASE_COL = 1
 HR_TRACKER_COL_WIDTH = 55
 
 # For filtering columns from HR Tracker
-COLUMN_MAPPINGS = {
-    4: "job_candidate_id",
-    47: "Cleared?",
-    48: "Cleared Email Sent"
+HR_COLUMN_MAPPINGS = {
+    3: "job_candidate_id",
+    46: "Cleared?",
+    47: "Cleared Email Sent"
 }
 
 # Rename fields from dbt report to match tracker headers
@@ -158,10 +158,10 @@ def _get_cleared_to_hire_data_from_hr_tracker(hr_worksheet: Worksheet) -> pd.Dat
         has_header=False,
         include_tailing_empty=True
         )
-    hr_tracker_df = hr_tracker_df.rename(columns=COLUMN_MAPPINGS)
+    hr_tracker_df = hr_tracker_df.rename(columns=HR_COLUMN_MAPPINGS)
 
     #  Filtering unneeded columns
-    column_filter = list(COLUMN_MAPPINGS.values())
+    column_filter = list(HR_COLUMN_MAPPINGS.values())
     hr_tracker_df[column_filter].copy()
     hr_tracker_df = hr_tracker_df[column_filter].copy()
 
@@ -244,10 +244,10 @@ def _update_dataframe(stale_df: pd.DataFrame, current_data_df: pd.DataFrame) -> 
         df = df.reset_index()
     except ValueError as error:
         logger.exception(error)
-        index_str = "\n".join(stale_df["job_candidate_id"].to_list())
-        logger.info(f"Here are the indexes from the tracker dataframe:\n{index_str}")
+        index_str = "\n".join(df["job_candidate_id"].to_list())
+        raise Exception(f"Duplicates found when calling reset_index(). "
+                        f"Here are the indexes from the tracker dataframe:\n{index_str}")
     return df
-
 
 
 def _update_rescinded_col(id_list: list, df: pd.DataFrame) -> pd.DataFrame:
