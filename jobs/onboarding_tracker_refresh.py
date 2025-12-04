@@ -268,7 +268,7 @@ def _update_tracker_data(tracker_backup_df: pd.DataFrame, jobvite_df: pd.DataFra
     return updated_tracker_df
 
 
-def tracker_refresh(tech_tracker_spreadsheet: Spreadsheet, hr_spreadsheet: Spreadsheet, year: str) -> None:
+def refresh_onboarding_tracker(tech_tracker_spreadsheet: Spreadsheet, hr_spreadsheet: Spreadsheet, year: str) -> None:
     dataset = os.getenv("GBQ_DATASET")
     bq_conn = BigQueryClient()
     jobvite_df = _get_and_prep_jobvite_data(bq_conn, dataset, year)
