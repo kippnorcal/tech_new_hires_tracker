@@ -36,12 +36,14 @@ def _refresh_dbt() -> None:
 
 def main(notifications):
     tech_spreadsheet = create_sheet_connection(TECH_TRACKER_SHEET)
+
+    if ARGS.dbt_refresh:
+        _refresh_dbt()
+
     if ARGS.sla_monitor_refresh:
         notifications.extend_job_name("- SLA Monitor Refresh")
         refresh_sla_source(tech_spreadsheet)
     else:
-        if ARGS.dbt_refresh:
-            _refresh_dbt()
         school_year = ARGS.school_year[0]
         notifications.extend_job_name(f"- {ARGS.school_year[0]}")
         hr_mot_spreadsheet = create_sheet_connection(HR_TRACKER_SHEET)
