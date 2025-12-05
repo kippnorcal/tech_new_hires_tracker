@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 python:3.12
+FROM python:3.12
 WORKDIR /code
 # python dependencies
 RUN pip install pipenv
