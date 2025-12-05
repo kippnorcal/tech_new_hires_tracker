@@ -57,8 +57,12 @@ def _filter_out_cleared_on_boarders(cleared_ids_df: pd.DataFrame, tech_tracker_d
 def _get_and_prep_datasource(bq_conn) -> pd.DataFrame:
     dataset = os.getenv("GBQ_DATASET")
     refreshed_df = bq_conn.get_table_as_df("rpt_staff__tech_offboarding_tracker_datasource", dataset=dataset)
+    refreshed_df["last_updated"] = refreshed_df["last_updated"].dt.strftime("%Y-%m-%d")
     refreshed_df = refreshed_df.rename(columns=REPORT_COLUMN_RENAME_MAP)
-    return refreshed_df.drop_duplicates(subset=["account_id"])
+    refreshed_df = refreshed_df.astype(str)
+    refreshed_df = refreshed_df.drop_duplicates(subset=["account_id"])
+    refreshed_df = refreshed_df.drop(["Status"], axis=1)
+    return refreshed_df
 
 
 def _get_and_prep_tracker_df(tracker_worksheet: Worksheet) -> pd.DataFrame:
@@ -66,7 +70,7 @@ def _get_and_prep_tracker_df(tracker_worksheet: Worksheet) -> pd.DataFrame:
     tracker_worksheet.sort_range(
         start=(TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL),
         end=(tracker_worksheet.rows, tracker_worksheet.cols),
-        basecolumnindex=2
+        basecolumnindex=15
     )
     # -1 to include headers
     df = tracker_worksheet.get_as_df(
@@ -75,7 +79,7 @@ def _get_and_prep_tracker_df(tracker_worksheet: Worksheet) -> pd.DataFrame:
         end=(tracker_worksheet.rows, TECH_TRACKER_COL_WIDTH),
         include_tailing_empty=False
     )
-    df.astype(str)
+    df = df.astype(str)
     return df
 
 
@@ -99,9 +103,6 @@ def _get_new_records(tracker_df: pd.DataFrame, jobvite_df: pd.DataFrame) -> pd.D
 def _insert_updated_data_to_google_sheets(updated_tracker_df: pd.DataFrame, tech_tracker_sheet: Worksheet) -> None:
     tech_tracker_sheet.set_dataframe(updated_tracker_df, (TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL),
                                      copy_head=False)
-    sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
-    tech_tracker_sheet.sort_range((TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL), sheet_dim, basecolumnindex=18,
-                                  sortorder="DESCENDING")
 
 
 def _update_dataframe(stale_df: pd.DataFrame, current_data_df: pd.DataFrame) -> pd.DataFrame:
