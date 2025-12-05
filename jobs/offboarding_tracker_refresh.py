@@ -152,7 +152,6 @@ def refresh_offboarding_tracker(tech_tracker_spreadsheet: Spreadsheet) -> None:
         logging.info(f"No new records to add to tracker sheet {tracker_name}")
 
     if not updated_tracker_df.empty:
-        updated_tracker_df.to_csv("tech_tracker_updates.csv", index=False)
         _insert_updated_data_to_google_sheets(updated_tracker_df, tech_tracker_sheet)
         logger.info(f"Finished refreshing tracker sheet {tracker_name}")
     else:
