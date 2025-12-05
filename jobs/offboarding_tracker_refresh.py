@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # Tech Tracker Cell References
 TECH_TRACKER_BASE_ROW = 4  # -1 to include
 TECH_TRACKER_BASE_COL = 2
-TECH_TRACKER_COL_WIDTH = 16
+TECH_TRACKER_COL_WIDTH = 14
 TECH_TIMESTAMP_CELL_REF = "A1"
 
 
@@ -22,18 +22,17 @@ TECH_TIMESTAMP_CELL_REF = "A1"
 REPORT_COLUMN_RENAME_MAP = {
     "account_id": "account_id",
     "local_staff_id": "Employee ID",
-    "staff_last_name": "Last Name",
-    "staff_first_name": "First Name",
+    "staff_last_first_name": "Staff Name",
     "staff_email": "Work Email",
     "personal_email": "Personal Email",
-    "staff.work_phone": "Work Phone",
-    "staff.staff_status": "Status",
-    "staff.termination_date": "Termination Date",
-    "staff.position_name": "Position",
-    "assigned_work_location": "Work Location",
-    "assigned_pay_location": "Pay Location",
-    "staff.supervisor_last_first_name": "Manager Name",
-    "staff.supervisor_email": "Manager Email",
+    "work_phone": "Work Phone",
+    "staff_status": "Status",
+    "termination_date": "Termination Date",
+    "position_name": "Position",
+    "work_location_description": "Work Location",
+    "pay_location_description": "Pay Location",
+    "supervisor_last_first_name": "Manager Name",
+    "supervisor_email": "Manager Email",
     "last_updated": "Last Updated",
 }
 
