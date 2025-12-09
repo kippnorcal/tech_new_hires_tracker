@@ -12,9 +12,9 @@ from pygsheets import Spreadsheet, Worksheet
 logger = logging.getLogger(__name__)
 
 # Tech Tracker Cell References for offboarding
-# Both the tracker and the cleared sheet have the same base row and column
-TECH_TRACKER_BASE_ROW = 4  # -1 to include
-TECH_TRACKER_BASE_COL = 2
+TECH_TRACKER_HEADER_ROW = 3
+TECH_TRACKER_DATA_ROW = 4
+TECH_TRACKER_DATA_COL = 2
 TECH_TRACKER_COL_WIDTH = 14
 TECH_TIMESTAMP_CELL_REF = "A1"
 
@@ -94,14 +94,14 @@ def _get_and_prep_datasource(bq_conn) -> pd.DataFrame:
 def _get_and_prep_tracker_df(tracker_worksheet: Worksheet) -> pd.DataFrame:
     # Sort range first to eliminate possible blank rows
     tracker_worksheet.sort_range(
-        start=(TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL),
+        start=(TECH_TRACKER_DATA_ROW, TECH_TRACKER_DATA_COL),
         end=(tracker_worksheet.rows, tracker_worksheet.cols),
         basecolumnindex=15
     )
     # -1 to include headers
     df = tracker_worksheet.get_as_df(
         has_header=True,
-        start=(TECH_TRACKER_BASE_ROW - 1, TECH_TRACKER_BASE_COL),
+        start=(TECH_TRACKER_HEADER_ROW, TECH_TRACKER_DATA_COL),
         end=(tracker_worksheet.rows, TECH_TRACKER_COL_WIDTH),
         include_tailing_empty=False
     )
@@ -128,7 +128,7 @@ def _get_new_records(tracker_df: pd.DataFrame, jobvite_df: pd.DataFrame) -> pd.D
 
 
 def _insert_updated_data_to_google_sheets(updated_tracker_df: pd.DataFrame, tech_tracker_sheet: Worksheet) -> None:
-    tech_tracker_sheet.set_dataframe(updated_tracker_df, (TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL),
+    tech_tracker_sheet.set_dataframe(updated_tracker_df, (TECH_TRACKER_DATA_ROW, TECH_TRACKER_DATA_COL),
                                      copy_head=False)
 
 
