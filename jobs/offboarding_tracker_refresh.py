@@ -11,7 +11,8 @@ from pygsheets import Spreadsheet, Worksheet
 
 logger = logging.getLogger(__name__)
 
-# Tech Tracker Cell References
+# Tech Tracker Cell References for offboarding
+# Both the tracker and the cleared sheet have the same base row and column
 TECH_TRACKER_BASE_ROW = 4  # -1 to include
 TECH_TRACKER_BASE_COL = 2
 TECH_TRACKER_COL_WIDTH = 14
