@@ -110,8 +110,9 @@ def _get_and_prep_tracker_df(tracker_worksheet: Worksheet) -> pd.DataFrame:
 
 def _get_cleared_tech_ids(spreadsheet: Spreadsheet) -> pd.DataFrame:
     cleared_sheet = spreadsheet.worksheet_by_title(f"Offboarding - Cleared")
-    return cleared_sheet.get_as_df(has_header=True, start="C3", end=(cleared_sheet.rows, 3),
+    cleared_sheet = cleared_sheet.get_as_df(has_header=True, start="B3", end=(cleared_sheet.rows, 2),
                                    include_tailing_empty=False)
+    return cleared_sheet.astype(str)
 
 
 def _get_new_records(tracker_df: pd.DataFrame, jobvite_df: pd.DataFrame) -> pd.DataFrame:
