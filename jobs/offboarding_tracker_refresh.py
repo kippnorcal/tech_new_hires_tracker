@@ -38,6 +38,30 @@ REPORT_COLUMN_RENAME_MAP = {
 }
 
 
+def _removed_offboarders_from_cleared_sheet(tracker: Spreadsheet) -> None:
+    cleared_sheet = tracker.worksheet_by_title(f"Offboarding - Cleared")
+
+    # Get cleared sheet data
+    cleared_sheet_df = cleared_sheet.get_as_df(
+        start=(TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL),
+        end=(cleared_sheet.rows, cleared_sheet.cols),
+        include_tailing_empty=False
+    )
+
+    # Filter out cleared onboarders greater than 30 days
+    cleared_sheet_df = cleared_sheet_df[cleared_sheet_df["Termination Date"].isnull() |
+                                         (pd.to_datetime(cleared_sheet_df["Termination Date"], format="%Y-%m-%d") -
+                                          pd.to_datetime(date.today())) > pd.Timedelta(days=30)]
+
+    cleared_sheet_df = cleared_sheet_df.astype(str)
+
+    # Clear data in cleared tracker sheet
+    cleared_sheet.clear(start=(TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL))
+
+    # Insert cleared onboarders back into cleared tracker sheet
+    cleared_sheet.set_dataframe(cleared_sheet_df, (TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL))
+
+
 def _create_tracker_updated_timestamp(tracker_worksheet: Worksheet) -> None:
     timestamp = datetime.now(tz=ZoneInfo("America/Los_Angeles"))
     d_stamp = timestamp.strftime("%x")
@@ -157,5 +181,7 @@ def refresh_offboarding_tracker(tech_tracker_spreadsheet: Spreadsheet) -> None:
         logger.info(f"Finished refreshing tracker sheet {tracker_name}")
     else:
         logger.info(f"No updates found. Nothing to refresh in sheet {tracker_name}")
+
+    _removed_offboarders_from_cleared_sheet(tech_tracker_spreadsheet)
 
     _create_tracker_updated_timestamp(tech_tracker_sheet)
