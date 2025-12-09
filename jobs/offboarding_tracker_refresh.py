@@ -44,7 +44,7 @@ def _create_tracker_updated_timestamp(tracker_worksheet: Worksheet) -> None:
     tracker_worksheet.update_value(TECH_TIMESTAMP_CELL_REF, f"LAST UPDATED: {d_stamp} @ {t_stamp}")
 
 
-def _filter_out_cleared_on_boarders(cleared_ids_df: pd.DataFrame, tech_tracker_df: pd.DataFrame) -> pd.DataFrame:
+def _filter_out_cleared_offboarders(cleared_ids_df: pd.DataFrame, tech_tracker_df: pd.DataFrame) -> pd.DataFrame:
     result = pd.merge(
         tech_tracker_df,
         cleared_ids_df,
@@ -133,7 +133,7 @@ def refresh_offboarding_tracker(tech_tracker_spreadsheet: Spreadsheet) -> None:
     # Tech Tracker has ability to clear onboarders who have completed onboarding to an archive sheet
     # The below filters those onboarders out of the Jobvite dataset
     cleared_ids_df = _get_cleared_tech_ids(tech_tracker_spreadsheet)
-    refreshed_df = _filter_out_cleared_on_boarders(cleared_ids_df, refreshed_df)
+    refreshed_df = _filter_out_cleared_offboarders(cleared_ids_df, refreshed_df)
     logging.info(f"Found {len(refreshed_df)} records to add or update")
 
     updated_tracker_df = pd.DataFrame()
