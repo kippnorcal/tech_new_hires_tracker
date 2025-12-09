@@ -43,24 +43,25 @@ def _removed_offboarders_from_cleared_sheet(tracker: Spreadsheet) -> None:
 
     # Get cleared sheet data
     cleared_sheet_df = cleared_sheet.get_as_df(
-        start=(TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL),
+        start=(TECH_TRACKER_HEADER_ROW, TECH_TRACKER_DATA_COL),
         end=(cleared_sheet.rows, cleared_sheet.cols),
         has_header=True,
         include_tailing_empty=False
     )
 
     # Filter out cleared onboarders greater than 30 days
-    cleared_sheet_df = cleared_sheet_df[cleared_sheet_df["Termination Date"].isnull() |
-                                         (pd.to_datetime(cleared_sheet_df["Termination Date"], format="%Y-%m-%d") -
-                                          pd.to_datetime(date.today())) > pd.Timedelta(days=30)]
+    cleared_sheet_df["Termination Date"] = pd.to_datetime(cleared_sheet_df["Termination Date"], format="%Y-%m-%d")
+
+    cleared_sheet_df = cleared_sheet_df.loc[cleared_sheet_df["Termination Date"] >
+                                          datetime.now() - pd.Timedelta(days=30)]
 
     cleared_sheet_df = cleared_sheet_df.astype(str)
 
     # Clear data in cleared tracker sheet
-    cleared_sheet.clear(start=(TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL))
+    cleared_sheet.clear(start=(TECH_TRACKER_DATA_ROW, TECH_TRACKER_DATA_COL))
 
     # Insert cleared onboarders back into cleared tracker sheet
-    cleared_sheet.set_dataframe(cleared_sheet_df, (TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL))
+    cleared_sheet.set_dataframe(cleared_sheet_df, (TECH_TRACKER_DATA_ROW, TECH_TRACKER_DATA_COL), copy_head=False)
 
 
 def _create_tracker_updated_timestamp(tracker_worksheet: Worksheet) -> None:
