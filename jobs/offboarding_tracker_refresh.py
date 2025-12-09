@@ -45,6 +45,7 @@ def _removed_offboarders_from_cleared_sheet(tracker: Spreadsheet) -> None:
     cleared_sheet_df = cleared_sheet.get_as_df(
         start=(TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL),
         end=(cleared_sheet.rows, cleared_sheet.cols),
+        has_header=True,
         include_tailing_empty=False
     )
 
