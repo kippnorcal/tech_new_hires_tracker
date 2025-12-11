@@ -199,7 +199,7 @@ def _get_rescinded_offers(bq_conn: BigQueryClient, dataset: str) -> Union[list, 
         return None
 
 
-def _insert_updated_data_to_google_sheets(updated_tracker_df: pd.DataFrame, tech_tracker_sheet: Spreadsheet) -> None:
+def _insert_updated_data_to_google_sheets(updated_tracker_df: pd.DataFrame, tech_tracker_sheet: Worksheet) -> None:
     tech_tracker_sheet.set_dataframe(updated_tracker_df, (TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL), copy_head=False)
     sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
     tech_tracker_sheet.sort_range((TECH_TRACKER_BASE_ROW, TECH_TRACKER_BASE_COL), sheet_dim, basecolumnindex=18, sortorder="DESCENDING")
@@ -236,8 +236,8 @@ def _rescind_records_from_tracker(updated_tracker_df: pd.DataFrame, rescinded_of
 
 def _update_dataframe(stale_df: pd.DataFrame, current_data_df: pd.DataFrame) -> pd.DataFrame:
     """Generalized func to update one dataframe with data from another"""
+    df = stale_df.copy()
     try:
-        df = stale_df.copy()
         df = df.set_index("job_candidate_id")
         current_data_df = current_data_df.set_index("job_candidate_id")
         df.update(current_data_df)
