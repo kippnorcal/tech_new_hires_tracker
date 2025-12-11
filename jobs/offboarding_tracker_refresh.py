@@ -131,6 +131,9 @@ def _get_new_records(tracker_df: pd.DataFrame, jobvite_df: pd.DataFrame) -> pd.D
 def _insert_updated_data_to_google_sheets(updated_tracker_df: pd.DataFrame, tech_tracker_sheet: Worksheet) -> None:
     tech_tracker_sheet.set_dataframe(updated_tracker_df, (TECH_TRACKER_DATA_ROW, TECH_TRACKER_DATA_COL),
                                      copy_head=False)
+    sheet_dim = (tech_tracker_sheet.rows, tech_tracker_sheet.cols)
+    tech_tracker_sheet.sort_range((TECH_TRACKER_DATA_ROW, TECH_TRACKER_DATA_COL), sheet_dim, basecolumnindex=18,
+                                  sortorder="DESCENDING")
 
 
 def _update_dataframe(stale_df: pd.DataFrame, current_data_df: pd.DataFrame) -> pd.DataFrame:
