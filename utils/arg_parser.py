@@ -21,5 +21,11 @@ def create_parser():
         help="Refreshes dbt before running updating tracker",
         action="store_true"
     )
+    parser.add_argument(
+        "--off-boarding-refresh",
+        dest="offboarding_refresh",
+        help="Refreshes offboarding tracker",
+        action="store_true"
+    )
 
     return parser

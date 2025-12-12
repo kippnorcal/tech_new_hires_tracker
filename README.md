@@ -26,7 +26,7 @@ GBQ_DATASET=
 
 # Sheet IDs
 TECH_TRACKER_SHEETS_ID=
-HR_MOT_SHEETS_ID=
+HR_TRACKER_SHEETS_ID=
 
 # Google Credentials:
 CREDENTIALS_FILE=
@@ -48,7 +48,14 @@ From the repo's directory, build Docker image
 docker build -t tech-tracker-connector .
 ``````
 
-There is a required runtime argument `--school-year` that accepts year in a YY-YY format.
+### Refreshing the Onboarding Tracker
+There is a required runtime argument to refresh the tracker, `--school-year`, that accepts year in a YY-YY format.
 ``````
 docker run tech-tracker-connector --school-year 24-25
+``````
+
+### Refreshing the Offboarding Tracker
+To refresh the offboarding tracker, use the `--off-boarding-refresh` flag:
+``````
+docker run tech-tracker-connector --off-boarding-refresh
 ``````
