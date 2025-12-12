@@ -26,8 +26,8 @@ HR_TRACKER_COL_WIDTH = 55
 # For filtering columns from HR Tracker
 HR_COLUMN_MAPPINGS = {
     3: "job_candidate_id",
-    46: "Cleared?",
-    47: "Cleared Email Sent"
+    50: "Cleared?",
+    51: "Cleared Email Sent"
 }
 
 # Rename fields from dbt report to match tracker headers
