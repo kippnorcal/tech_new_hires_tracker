@@ -83,7 +83,7 @@ def _filter_out_cleared_offboarders(cleared_ids_df: pd.DataFrame, tech_tracker_d
 
 def _get_and_prep_datasource(bq_conn) -> pd.DataFrame:
     dataset = os.getenv("GBQ_DATASET")
-    refreshed_df = bq_conn.get_table_as_df("rpt_staff__tech_offboarding_tracker_datasource", dataset=dataset)
+    refreshed_df = bq_conn.get_table_as_df("rpt_staff__tech_offboarding_tracker_data_source", dataset=dataset)
     refreshed_df["last_updated"] = refreshed_df["last_updated"].dt.strftime("%Y-%m-%d")
     refreshed_df = refreshed_df.rename(columns=REPORT_COLUMN_RENAME_MAP)
     refreshed_df = refreshed_df.astype(str)
