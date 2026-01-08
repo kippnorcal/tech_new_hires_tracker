@@ -236,6 +236,8 @@ def _rescind_records_from_tracker(updated_tracker_df: pd.DataFrame, rescinded_of
 
 def _update_dataframe(stale_df: pd.DataFrame, current_data_df: pd.DataFrame) -> pd.DataFrame:
     """Generalized func to update one dataframe with data from another"""
+    stale_df = stale_df[stale_df["job_candidate_id"] != ""]
+    current_data_df = current_data_df[current_data_df["job_candidate_id"] != ""]
     df = stale_df.copy()
     try:
         df = df.set_index("job_candidate_id")
